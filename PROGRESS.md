@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T0.4 (after gallery review)
+**Next action:** Implement T0.4a
 **Current phase:** 0
 
 ## Needs you
@@ -18,7 +18,8 @@ _(Nothing pending for Supabase authentication.)_
 | T0.2 | Design tokens and base UI (Card, StatTile, RingGauge, IconChip, ListRow, TrendChip, BottomTabs, Sheet) plus a `/dev` gallery page | §13 tokens | DONE |
 | T0.2a | Correct gallery typography and responsive proportions against the visual reference | §13 tokens | DONE |
 | T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | DONE |
-| T0.4 | Web Push spike: VAPID keys script, service-worker push handler with Done/Snooze actions → `notification-action` function; `send-test-push` function; "Send test push" in Settings. Use a Deno-compatible Web Push library; if it fails, record the fallback (FCM) in DECISIONS.md | §6 actions, §14 Push | TODO |
+| T0.4a | Web Push backend, VAPID setup and authenticated test push actions | §6 actions, §14 Push | IN PROGRESS |
+| T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | TODO |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | TODO |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
