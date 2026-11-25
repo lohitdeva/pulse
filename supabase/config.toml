@@ -33,3 +33,9 @@ enable_signup = false
 enable_confirmations = false
 otp_length = 6
 otp_expiry = 3600
+
+[functions.send-test-push]
+verify_jwt = true
+
+[functions.notification-action]
+verify_jwt = false
