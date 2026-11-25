@@ -2,13 +2,16 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Set up Supabase for T0.3
+**Next action:** After the Supabase setup below, resume T0.3.
 **Current phase:** 0
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-_(Nothing yet.)_
+1. Create a free Supabase project for Pulse under your own account.
+2. In the project’s Authentication settings, create or invite your own email user, enable email sign-in, then disable new user sign-ups.
+3. Create `.env.local` in the repository root. Set `VITE_SUPABASE_URL` to the project URL and `VITE_SUPABASE_ANON_KEY` to its public anon or publishable key. Keep the values local.
+4. Tell the planner that setup is complete to resume T0.3.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -16,7 +19,7 @@ _(Nothing yet.)_
 | T0.1a | Workspace and quality tooling for app and shared | §14 Stack | DONE |
 | T0.1b | Vite React TS app, Tailwind, PWA, dev and build | §14 Stack | DONE |
 | T0.2 | Design tokens and base UI (Card, StatTile, RingGauge, IconChip, ListRow, TrendChip, BottomTabs, Sheet) plus a `/dev` gallery page | §13 tokens | DONE |
-| T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | IN PROGRESS |
+| T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | WAITING ON USER |
 | T0.4 | Web Push spike: VAPID keys script, service-worker push handler with Done/Snooze actions → `notification-action` function; `send-test-push` function; "Send test push" in Settings. Use a Deno-compatible Web Push library; if it fails, record the fallback (FCM) in DECISIONS.md | §6 actions, §14 Push | TODO |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | TODO |
 
@@ -106,3 +109,5 @@ _(Nothing yet.)_
 
 ## Session log
 _(One line per session: date, phase, tickets done, where it stopped.)_
+
+- 2026-11-26 — Phase 0: T0.1a, T0.1b and T0.2 verified and committed. T0.3 waiting for Supabase project setup.
