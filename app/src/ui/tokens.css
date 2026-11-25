@@ -1,0 +1,25 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --pulse-bg: #0b0e14;
+  --pulse-surface: #161b26;
+  --pulse-surface-raised: #1c2331;
+  --pulse-border: #222938;
+  --pulse-text: #f2f4f8;
+  --pulse-muted: #8a93a6;
+  --pulse-blue: #2f7bf6;
+  --pulse-blue-light: #79aaff;
+  --pulse-mint: #7fe3d6;
+  --pulse-gradient: linear-gradient(125deg, #3a8dff 0%, #7fe3d6 100%);
+  --pulse-green: #27c281;
+  --pulse-orange: #f5812a;
+  --pulse-red: #f0565b;
+  --pulse-radius: 20px;
+  --pulse-control-size: 44px;
+  --pulse-card-padding: 16px;
+  --pulse-gap: 12px;
+  --pulse-shadow: 0 24px 80px rgb(0 0 0 / 38%);
+}

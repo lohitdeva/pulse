@@ -1,12 +1,30 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
+import { DevGallery } from "./DevGallery";
 import "./styles.css";
 
-createRoot(document.getElementById("root")!).render(
-  <main className="flex min-h-screen items-center justify-center bg-stone-50 text-stone-900">
-    <h1 className="text-4xl font-semibold tracking-tight">Pulse</h1>
-  </main>,
-);
+function App() {
+  const isGallery = window.location.pathname.replace(/\/+$/, "") === "/dev";
+
+  if (isGallery) {
+    return <DevGallery />;
+  }
+
+  return (
+    <main className="home-shell">
+      <section className="home-card" aria-labelledby="home-title">
+        <p className="eyebrow">YOUR DAILY SIGNAL</p>
+        <h1 id="home-title">Pulse</h1>
+        <p className="home-copy">A calmer way to see how your day is going.</p>
+        <a className="button button-primary" href="/dev">
+          Explore the UI gallery
+        </a>
+      </section>
+    </main>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<App />);
 
 if (import.meta.env.PROD) {
   registerSW({ immediate: true });
