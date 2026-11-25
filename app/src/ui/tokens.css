@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+  --pulse-font: Inter, "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--pulse-font);
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
 
   --pulse-bg: #0b0e14;
   --pulse-surface: #161b26;

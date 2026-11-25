@@ -41,12 +41,8 @@ export function DevGallery() {
         <div className="gallery-heading">
           <p className="eyebrow">PULSE · COMPONENTS</p>
           <h1>UI gallery</h1>
-          <p>A small, interactive look at the building blocks.</p>
         </div>
-        <span className="gallery-status">Local preview</span>
       </header>
-
-      <p className="gallery-active" aria-live="polite">Previewing {activeTab}</p>
 
       <div className="gallery-grid">
         <section className="gallery-section" aria-labelledby="section-card-gauge">
@@ -60,15 +56,14 @@ export function DevGallery() {
                 </div>
                 <TrendChip value="+8%" direction="up" label="8 percent above your weekly average" />
               </div>
-              <p>Steady progress across your focus, movement, and recovery.</p>
             </div>
             <div className="hero-main">
-              <Card className="gauge-card">
+              <div className="gauge-wrap">
                 <RingGauge value={72} max={100} label="Daily score" unit="of 100" valueLabel="72" />
-              </Card>
+              </div>
               <div className="stat-grid">
                 <StatTile label="Focus" value="3.8" unit="h" icon={<Glyph name="spark" />} accent="blue" />
-                <StatTile label="Movement" value="6.2" unit="k steps" icon={<Glyph name="bolt" />} accent="mint" />
+                <StatTile label="Steps" value="6.2" unit="k" icon={<Glyph name="bolt" />} accent="mint" />
                 <StatTile label="Sleep" value="7.4" unit="h" icon={<Glyph name="sun" />} accent="orange" />
                 <StatTile label="Habits" value="4/5" icon={<Glyph name="check" />} accent="red" />
               </div>
@@ -113,7 +108,6 @@ export function DevGallery() {
               </div>
               <TrendChip value="+5%" direction="up" />
             </div>
-            <p>Icon actions keep a 44 px target and include a screen-reader label.</p>
             <button className="button button-secondary" type="button" onClick={() => setSheetOpen(true)}>
               Open the sheet
             </button>
@@ -141,7 +135,6 @@ export function DevGallery() {
         <section className="gallery-section gallery-section-third" aria-labelledby="section-tabs">
           <SectionHeading id="section-tabs" title="BottomTabs" detail="Five primary destinations" />
           <Card className="tab-note">
-            <p>Choose any tab below to update the preview state.</p>
             <span className="active-tab-label">Active: {activeTab}</span>
           </Card>
         </section>
