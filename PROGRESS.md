@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T0.4b
+**Next action:** Implement T0.4b
 **Current phase:** 0
 
 ## Needs you
@@ -19,7 +19,7 @@ _(Nothing pending for Supabase authentication.)_
 | T0.2a | Correct gallery typography and responsive proportions against the visual reference | §13 tokens | DONE |
 | T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | DONE |
 | T0.4a | Web Push backend, VAPID setup and authenticated test push actions | §6 actions, §14 Push | DONE |
-| T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | TODO |
+| T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | IN PROGRESS |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | TODO |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
