@@ -1,0 +1,43 @@
+{
+  "_source": "Transcribed by hand from docs/reference/timetable-screenshot.png (sheet '2026-28_ MBA_Term II Schedule', tab 'Schedule', rows 1-19). Exact spacing and line breaks inside cells may differ from the live sheet. Once the college bridge sends its first real payload, save it as a second fixture and keep both.",
+  "shape": "Mimics what the Apps Script bridge sends: 'values' = sheet.getDataRange().getDisplayValues() (merged cells: only the top-left cell holds text, the rest are empty strings), 'merges' = sheet.getDataRange().getMergedRanges() as A1 notations.",
+  "sheetName": "Schedule",
+  "values": [
+    ["", "", "", "", "", "", "", ""],
+    ["MBA - I, Term - II, Time Table, 2026 - 2028 Batch", "", "", "", "", "", "", ""],
+    ["Date", "Day", "Sections", "09:30 AM\n11:00 AM", "11:15 AM\n12:45 PM", "LUNCH\n12:45 PM - 02:00 PM", "02:00 PM 03:30 PM", "03:45 PM 05:15 PM"],
+    ["28-Sep", "Monday", "A", "Term\nRegistration          (\n10:30 - 01:00)", "", "", "MM-II-1    (Prof. Atul Prashar)", "OM-I - 1 ( Prof.  Rohit Gupta )"],
+    ["", "", "B", "", "", "", "OM-I - 1 ( Prof.  Rohit Gupta )", "MM-II-1    (Prof. Atul Prashar)"],
+    ["", "", "C", "", "", "", "OB-II-1    (Prof. Shikha Bhardwaj)", "FM-I-1                (Prof. Soumya Guha Deb)"],
+    ["", "", "D", "", "", "", "FM-I-1\n(Prof. Soumya Guha Deb)", "OB-II-1    (Prof. Shikha Bhardwaj)"],
+    ["29-Sep", "Tuesday", "A", "OB-II-1    (Prof. Shikha Bhardwaj)", "", "", "FM-I-1\n(Prof. Soumya Guha Deb)", "MM-II-2    (Prof. Atul Prashar)"],
+    ["", "", "B", "", "OB-II-1    (Prof. Shikha Bhardwaj)", "", "MM-II-2    (Prof. Atul Prashar)", "FM-I-1                (Prof. Soumya Guha Deb)"],
+    ["", "", "C", "MM-II-1    (Prof. Atul Prashar)", "OM-I - 1 ( Prof.  Rohit Gupta )", "", "DS - II-1\nProf. Sourabh Kumar", ""],
+    ["", "", "D", "OM-I - 1 ( Prof.  Rohit Gupta )", "MM-II-1    (Prof. Atul Prashar)", "", "", "DS - II-1\nProf. Sourabh Kumar"],
+    ["30-Sep", "Wednesday", "A", "", "", "", "OM-I - 2 ( Prof.  Rohit Gupta )", "MM-II-3    (Prof. Atul Prashar)"],
+    ["", "", "B", "", "", "", "MM-II-3    (Prof. Atul Prashar)   ( B04)", "OM-I - 2 ( Prof.  Rohit Gupta )   ( B04)"],
+    ["", "", "C", "MM-II-2    (Prof. Atul Prashar)", "", "", "", "FM-I-2\n(Prof. Soumya Guha Deb)\n( B06)"],
+    ["", "", "D", "", "MM-II-2    (Prof. Atul Prashar)", "", "FM-I-2\n(Prof. Soumya Guha Deb)", ""],
+    ["1-Oct", "Thursday", "A", "DS - II-1\nProf. Sourabh Kumar", "", "", "", "FM-I-2                (Prof. Soumya Guha Deb)"],
+    ["", "", "B", "", "DS - II-1\nProf. Sourabh Kumar  ( B01)", "", "FM-I-2\n(Prof. Soumya Guha Deb)", "Industry Talk"],
+    ["", "", "C", "MM-II-3    (Prof. Atul Prashar)", "OM-I - 2 ( Prof.  Rohit Gupta )", "", "", ""],
+    ["", "", "D", "OM-I - 2 ( Prof.  Rohit Gupta )", "MM-II-3    (Prof. Atul Prashar)", "", "", ""]
+  ],
+  "merges": ["A2:H2", "A4:A7", "B4:B7", "D4:E7", "A8:A11", "B8:B11", "A12:A15", "B12:B15", "D13:E13", "A16:A19", "B16:B19", "H17:H19"],
+  "merges_note": "H17:H19 ('Industry Talk') may extend below row 19 in the live sheet; the screenshot is cut off there.",
+  "section": "C",
+  "termYearRule": "Sep-Dec => 2026, Jan onward => 2027",
+  "expected_section_C": [
+    {"date": "2026-09-28", "start": "10:30", "end": "13:00", "kind": "event", "title": "Term Registration", "course": null, "session": null, "professor": null, "room": null, "note": "Merged D4:E7 covers all sections; explicit '10:30 - 01:00' overrides slot times; '01:00' is 1 PM"},
+    {"date": "2026-09-28", "start": "14:00", "end": "15:30", "kind": "class", "title": "OB-II-1", "course": "OB-II", "session": 1, "professor": "Prof. Shikha Bhardwaj", "room": null},
+    {"date": "2026-09-28", "start": "15:45", "end": "17:15", "kind": "class", "title": "FM-I-1", "course": "FM-I", "session": 1, "professor": "Prof. Soumya Guha Deb", "room": null},
+    {"date": "2026-09-29", "start": "09:30", "end": "11:00", "kind": "class", "title": "MM-II-1", "course": "MM-II", "session": 1, "professor": "Prof. Atul Prashar", "room": null},
+    {"date": "2026-09-29", "start": "11:15", "end": "12:45", "kind": "class", "title": "OM-I-1", "course": "OM-I", "session": 1, "professor": "Prof. Rohit Gupta", "room": null},
+    {"date": "2026-09-29", "start": "14:00", "end": "15:30", "kind": "class", "title": "DS-II-1", "course": "DS-II", "session": 1, "professor": "Prof. Sourabh Kumar", "room": null, "note": "No brackets around the professor"},
+    {"date": "2026-09-30", "start": "09:30", "end": "11:00", "kind": "class", "title": "MM-II-2", "course": "MM-II", "session": 2, "professor": "Prof. Atul Prashar", "room": null},
+    {"date": "2026-09-30", "start": "15:45", "end": "17:15", "kind": "class", "title": "FM-I-2", "course": "FM-I", "session": 2, "professor": "Prof. Soumya Guha Deb", "room": "B06"},
+    {"date": "2026-10-01", "start": "09:30", "end": "11:00", "kind": "class", "title": "MM-II-3", "course": "MM-II", "session": 3, "professor": "Prof. Atul Prashar", "room": null},
+    {"date": "2026-10-01", "start": "11:15", "end": "12:45", "kind": "class", "title": "OM-I-2", "course": "OM-I", "session": 2, "professor": "Prof. Rohit Gupta", "room": null},
+    {"date": "2026-10-01", "start": "15:45", "end": "17:15", "kind": "event", "title": "Industry Talk", "course": null, "session": null, "professor": null, "room": null, "note": "Merged H17:H19 starts in row B; Section C inherits it"}
+  ]
+}

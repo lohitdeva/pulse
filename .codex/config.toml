@@ -1,0 +1,14 @@
+# Project-level Codex config for Pulse.
+# The planner (main session) runs on GPT-6.2 Astra at low effort to keep its token use small.
+# All implementation is delegated to GPT-6 Luna subagents (see .codex/agents/).
+model = "gpt-6.2-astra"
+model_reasoning_effort = "low"
+
+# AGENTS.md is loaded every session; keep it under the default 32 KiB limit.
+project_doc_max_bytes = 32768
+
+[agents]
+default_subagent_model = "gpt-6-luna"
+default_subagent_reasoning_effort = "max"
+# At most 3 builders in parallel, and only on non-overlapping files (see AGENTS.md).
+max_concurrent_threads_per_session = 3
