@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Implement T0.1a
+**Next action:** T0.1b
 **Current phase:** 0
 
 ## Needs you
@@ -13,7 +13,7 @@ _(Nothing yet.)_
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
-| T0.1a | Workspace and quality tooling for app and shared | §14 Stack | IN PROGRESS |
+| T0.1a | Workspace and quality tooling for app and shared | §14 Stack | DONE |
 | T0.1b | Vite React TS app, Tailwind, PWA, dev and build | §14 Stack | TODO |
 | T0.2 | Design tokens and base UI (Card, StatTile, RingGauge, IconChip, ListRow, TrendChip, BottomTabs, Sheet) plus a `/dev` gallery page | §13 tokens | TODO |
 | T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | TODO |

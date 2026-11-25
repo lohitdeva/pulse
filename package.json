@@ -1,0 +1,17 @@
+{
+  "name": "pulse-kit",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "pnpm --filter @pulse/app dev",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml eslint.config.mjs tsconfig.json shared"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^4.0.8"
+  }
+}
