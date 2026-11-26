@@ -1,5 +1,4 @@
-export const NOTIFICATION_ACTION_PATH =
-  "/functions/v1/notification-action";
+export const NOTIFICATION_ACTION_PATH = "/functions/v1/notification-action";
 export const NOTIFICATION_TEST_HASH = "#test-push";
 
 export interface NotificationPanelFocusTarget {
@@ -50,8 +49,47 @@ export interface EnrollPushDependencies {
 }
 
 export type EnrollPushResult =
-  | { status: "denied" }
-  | { status: "granted"; subscriptionId: string };
+  { status: "denied" } | { status: "granted"; subscriptionId: string };
+
+const PUSH_STAGE_TIMEOUT_MS = 10_000;
+const PUSH_PERMISSION_TIMEOUT_MS = 30_000;
+
+export function runPushStage<T>(
+  start: () => T | PromiseLike<T>,
+  timeoutMs: number,
+  errorMessage: string,
+): Promise<T> {
+  let operation: Promise<T>;
+  try {
+    operation = Promise.resolve(start());
+  } catch {
+    return Promise.reject(new Error(errorMessage));
+  }
+
+  let timeoutId!: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+
+  return Promise.race([
+    operation.catch(() => {
+      throw new Error(errorMessage);
+    }),
+    timeout,
+  ]).finally(() => clearTimeout(timeoutId));
+}
+
+export function requestPushPermission(
+  permission: NotificationPermission,
+  requestPermission: () => Promise<NotificationPermission>,
+): Promise<NotificationPermission> {
+  if (permission !== "default") return Promise.resolve(permission);
+  return runPushStage(
+    requestPermission,
+    PUSH_PERMISSION_TIMEOUT_MS,
+    "The browser permission prompt did not finish. Check notification settings, then retry.",
+  );
+}
 
 export function decodeApplicationServerKey(encoded: string): Uint8Array {
   const normalized = encoded.trim().replace(/-/g, "+").replace(/_/g, "/");
@@ -59,7 +97,9 @@ export function decodeApplicationServerKey(encoded: string): Uint8Array {
     throw new Error("Invalid VAPID public key");
   }
 
-  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
+  const binary = atob(
+    normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="),
+  );
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
@@ -71,22 +111,31 @@ export function decodeApplicationServerKey(encoded: string): Uint8Array {
 export async function enrollPushSubscription(
   dependencies: EnrollPushDependencies,
 ): Promise<EnrollPushResult> {
-  const permission =
-    dependencies.permission === "default"
-      ? await dependencies.requestPermission()
-      : dependencies.permission;
+  const permission = await requestPushPermission(
+    dependencies.permission,
+    dependencies.requestPermission,
+  );
   if (permission !== "granted") return { status: "denied" };
 
   const applicationServerKey = decodeApplicationServerKey(
     dependencies.vapidPublicKey,
   );
-  const existing = await dependencies.pushManager.getSubscription();
+  const existing = await runPushStage(
+    () => dependencies.pushManager.getSubscription(),
+    PUSH_STAGE_TIMEOUT_MS,
+    "Could not check for an existing browser subscription. Retry push setup.",
+  );
   const subscription =
     existing ??
-    (await dependencies.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
-    }));
+    (await runPushStage(
+      () =>
+        dependencies.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
+        }),
+      PUSH_STAGE_TIMEOUT_MS,
+      "The browser could not create a push subscription. Check notification settings and retry.",
+    ));
   const keys = subscription.toJSON().keys;
   if (
     !subscription.endpoint ||
@@ -98,12 +147,17 @@ export async function enrollPushSubscription(
     throw new Error("Browser returned an incomplete push subscription");
   }
 
-  const subscriptionId = await dependencies.upsert({
+  const record: PushSubscriptionRecord = {
     user_id: dependencies.userId,
     endpoint: subscription.endpoint,
     p256dh: keys.p256dh,
     auth: keys.auth,
-  });
+  };
+  const subscriptionId = await runPushStage(
+    () => dependencies.upsert(record),
+    PUSH_STAGE_TIMEOUT_MS,
+    "Could not save the push subscription. Check your connection and retry.",
+  );
   if (!subscriptionId) throw new Error("Could not save push subscription");
   return { status: "granted", subscriptionId };
 }
@@ -146,24 +200,39 @@ export async function configurePushWorker(
     const channel = new MessageChannel();
     const timeout = setTimeout(() => {
       channel.port1.close();
-      reject(new Error("Service worker did not save push settings"));
+      channel.port2.close();
+      reject(
+        new Error(
+          "Pulse service worker did not respond to push setup. Refresh the app and retry.",
+        ),
+      );
     }, 5000);
     channel.port1.onmessage = (event: MessageEvent<unknown>) => {
       clearTimeout(timeout);
       channel.port1.close();
       const result = event.data as { ok?: unknown } | null;
       if (result?.ok === true) resolve();
-      else reject(new Error("Service worker could not save push settings"));
+      else {
+        reject(
+          new Error(
+            "Pulse service worker could not save push settings. Refresh the app and retry.",
+          ),
+        );
+      }
     };
     try {
-      worker.postMessage(
-        { type: "pulse-push-config", ...configuration },
-        [channel.port2],
-      );
-    } catch (error) {
+      worker.postMessage({ type: "pulse-push-config", ...configuration }, [
+        channel.port2,
+      ]);
+    } catch {
       clearTimeout(timeout);
       channel.port1.close();
-      reject(error);
+      channel.port2.close();
+      reject(
+        new Error(
+          "Pulse service worker could not receive push settings. Refresh the app and retry.",
+        ),
+      );
     }
   });
 }
@@ -527,5 +596,7 @@ function isCapability(value: unknown): value is string {
 }
 
 function isLocalhost(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+  );
 }

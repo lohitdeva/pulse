@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  configurePushWorker,
   decodeApplicationServerKey,
   enrollPushSubscription,
   focusNotificationPanel,
   installPushWorkerHandlers,
   NOTIFICATION_TEST_HASH,
+  requestPushPermission,
+  runPushStage,
   sendTestPush,
+  type PushWorkerMessenger,
   type PushWorkerScope,
 } from "./push";
 
@@ -16,6 +20,51 @@ const actionEndpoint =
 const apikey = "public-publishable-key";
 
 describe("push enrollment", () => {
+  it("requests permission immediately and bounds a stalled prompt so retry works", async () => {
+    vi.useFakeTimers();
+    try {
+      const requestPermission = vi.fn(
+        () => new Promise<NotificationPermission>(() => undefined),
+      );
+      const pending = requestPushPermission("default", requestPermission);
+
+      expect(requestPermission).toHaveBeenCalledOnce();
+      const timedOut = expect(pending).rejects.toThrow(
+        "The browser permission prompt did not finish. Check notification settings, then retry.",
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await timedOut;
+
+      await expect(
+        requestPushPermission("default", async () => "granted"),
+      ).resolves.toBe("granted");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds stalled service worker readiness and allows the same stage to retry", async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = runPushStage(
+        () => new Promise<string>(() => undefined),
+        1_000,
+        "Pulse service worker did not become ready. Refresh and retry.",
+      );
+      const timedOut = expect(pending).rejects.toThrow(
+        "Pulse service worker did not become ready. Refresh and retry.",
+      );
+      await vi.advanceTimersByTimeAsync(1_000);
+      await timedOut;
+
+      await expect(
+        runPushStage(() => Promise.resolve("active"), 1_000, "unreachable"),
+      ).resolves.toBe("active");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reuses an existing browser subscription and upserts it by user and endpoint", async () => {
     const subscription = {
       endpoint: "https://fcm.googleapis.com/fcm/send/token",
@@ -26,7 +75,9 @@ describe("push enrollment", () => {
       subscribe: vi.fn(),
     };
     const upsert = vi.fn(async () => "subscription-id");
-    const requestPermission = vi.fn(async () => "granted" as NotificationPermission);
+    const requestPermission = vi.fn(
+      async () => "granted" as NotificationPermission,
+    );
 
     const result = await enrollPushSubscription({
       permission: "default",
@@ -37,7 +88,10 @@ describe("push enrollment", () => {
       upsert,
     });
 
-    expect(result).toEqual({ status: "granted", subscriptionId: "subscription-id" });
+    expect(result).toEqual({
+      status: "granted",
+      subscriptionId: "subscription-id",
+    });
     expect(requestPermission).toHaveBeenCalledOnce();
     expect(pushManager.getSubscription).toHaveBeenCalledOnce();
     expect(pushManager.subscribe).not.toHaveBeenCalled();
@@ -47,11 +101,70 @@ describe("push enrollment", () => {
       p256dh: "public-key",
       auth: "auth-key",
     });
-    expect(decodeApplicationServerKey("AQID")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(decodeApplicationServerKey("AQID")).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
+  });
+
+  it("times out a stalled save and retries with the existing browser subscription", async () => {
+    vi.useFakeTimers();
+    try {
+      const subscription = {
+        endpoint: "https://fcm.googleapis.com/fcm/send/token",
+        toJSON: () => ({ keys: { p256dh: "public-key", auth: "auth-key" } }),
+      };
+      const pushManager = {
+        getSubscription: vi.fn(async () => subscription),
+        subscribe: vi.fn(),
+      };
+      let signalStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        signalStarted = resolve;
+      });
+      const pending = enrollPushSubscription({
+        permission: "granted",
+        requestPermission: vi.fn(),
+        pushManager,
+        userId: "user-id",
+        vapidPublicKey: "AQID",
+        upsert: vi.fn(
+          () =>
+            new Promise<string>(() => {
+              signalStarted();
+            }),
+        ),
+      });
+      const timedOut = expect(pending).rejects.toThrow(
+        "Could not save the push subscription. Check your connection and retry.",
+      );
+      await started;
+      await vi.advanceTimersByTimeAsync(10_000);
+      await timedOut;
+
+      const result = await enrollPushSubscription({
+        permission: "granted",
+        requestPermission: vi.fn(),
+        pushManager,
+        userId: "user-id",
+        vapidPublicKey: "AQID",
+        upsert: async () => "subscription-id",
+      });
+
+      expect(result).toEqual({
+        status: "granted",
+        subscriptionId: "subscription-id",
+      });
+      expect(pushManager.getSubscription).toHaveBeenCalledTimes(2);
+      expect(pushManager.subscribe).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not subscribe or save when permission is denied", async () => {
-    const requestPermission = vi.fn(async () => "denied" as NotificationPermission);
+    const requestPermission = vi.fn(
+      async () => "denied" as NotificationPermission,
+    );
     const pushManager = {
       getSubscription: vi.fn(),
       subscribe: vi.fn(),
@@ -73,8 +186,8 @@ describe("push enrollment", () => {
   });
 
   it("sends the authenticated test request to the Supabase function", async () => {
-    const fetcher = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    const fetcher = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
 
     const sent = await sendTestPush(
@@ -105,6 +218,58 @@ describe("push enrollment", () => {
 });
 
 describe("service worker push actions", () => {
+  it("bounds a stalled worker configuration handshake and can retry", async () => {
+    vi.useFakeTimers();
+    const channels: Array<{
+      port1: {
+        onmessage: ((event: MessageEvent<unknown>) => void) | null;
+        close: ReturnType<typeof vi.fn>;
+      };
+      port2: { close: ReturnType<typeof vi.fn> };
+    }> = [];
+    class FakeMessageChannel {
+      port1 = {
+        onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+        close: vi.fn(),
+      };
+      port2 = { close: vi.fn() };
+
+      constructor() {
+        channels.push(this);
+      }
+    }
+    vi.stubGlobal("MessageChannel", FakeMessageChannel);
+
+    try {
+      let respond = false;
+      const worker: PushWorkerMessenger = {
+        postMessage: vi.fn(() => {
+          if (respond) {
+            channels.at(-1)?.port1.onmessage?.({
+              data: { ok: true },
+            } as MessageEvent<unknown>);
+          }
+        }),
+      };
+      const configuration = { actionEndpoint, apikey };
+      const pending = configurePushWorker(worker, configuration);
+      const timedOut = expect(pending).rejects.toThrow(
+        "Pulse service worker did not respond to push setup. Refresh the app and retry.",
+      );
+      await vi.advanceTimersByTimeAsync(5_000);
+      await timedOut;
+
+      respond = true;
+      await expect(
+        configurePushWorker(worker, configuration),
+      ).resolves.toBeUndefined();
+      expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("posts Done and Snooze to the exact configured backend with the public key", async () => {
     const { scope, handlers } = makeWorkerScope();
     const fetcher = vi.fn(async () => new Response("{}", { status: 200 }));

@@ -5,6 +5,8 @@ import {
   createNotificationActionEndpoint,
   enrollPushSubscription,
   focusNotificationPanel,
+  requestPushPermission,
+  runPushStage,
   sendTestPush,
 } from "./push";
 
@@ -46,20 +48,42 @@ export function PushSettings({ client, userId }: PushSettingsProps) {
         !("serviceWorker" in navigator) ||
         !("PushManager" in window)
       ) {
-        throw new Error("Push notifications are not supported by this browser.");
+        throw new Error(
+          "Push notifications are not supported by this browser.",
+        );
       }
       if (!supabaseUrl || !supabaseKey || !vapidPublicKey) {
         throw new Error("Push is not configured for this deployment.");
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      // Start the permission request in the button's original user-gesture task.
+      const permission = await requestPushPermission(
+        Notification.permission,
+        () => Notification.requestPermission(),
+      );
+      if (permission !== "granted") {
+        setMessage(
+          permission === "denied"
+            ? "Notifications are blocked in browser settings. Allow notifications for Pulse, then retry."
+            : "Notification permission was not granted. Tap Enable again and allow notifications.",
+        );
+        return;
+      }
+
+      const registration = await runPushStage(
+        () => navigator.serviceWorker.ready,
+        10_000,
+        "Pulse service worker did not become ready. Check your connection, refresh the app, and retry.",
+      );
       if (!registration.active) {
-        throw new Error("Pulse service worker is not ready yet.");
+        throw new Error(
+          "Pulse service worker has not activated yet. Refresh the app and retry.",
+        );
       }
 
       const enrollment = await enrollPushSubscription({
-        permission: Notification.permission,
-        requestPermission: () => Notification.requestPermission(),
+        permission,
+        requestPermission: async () => permission,
         pushManager: registration.pushManager,
         userId,
         vapidPublicKey,
@@ -86,10 +110,14 @@ export function PushSettings({ client, userId }: PushSettingsProps) {
         apikey: supabaseKey,
       });
       setSubscriptionId(enrollment.subscriptionId);
-      setMessage("Push is enabled. Send a test notification to confirm delivery.");
-    } catch {
+      setMessage(
+        "Push is enabled. Send a test notification to confirm delivery.",
+      );
+    } catch (cause) {
       setError(
-        "Could not enable push. Check the app configuration and try again.",
+        cause instanceof Error
+          ? cause.message
+          : "Could not enable push. Check the app configuration and retry.",
       );
     } finally {
       setEnabling(false);
