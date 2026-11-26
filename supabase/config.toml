@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.ingest-timetable]
 verify_jwt = false
+
+[functions.dispatch-reminders]
+verify_jwt = false

@@ -3,14 +3,14 @@
  * concrete schedule items with UTC instants, and places the leftover daily
  * news-reading minutes into the earliest free slots. Pure, no I/O.
  */
-import { blockInstants } from "./time";
+import { blockInstants } from "./time.ts";
 import {
   WEEKDAY_TEMPLATE,
   WEEKEND_TEMPLATE,
   type BlockType,
   type DayTemplate,
   type TemplateBlock,
-} from "./schedule";
+} from "./schedule.ts";
 
 export interface PlanInterval {
   start: Date;

@@ -7,9 +7,9 @@
  * attendance prompt. Calling `evaluate` every minute never double-sends as long as the
  * caller records `lastSentAt`/`sentCount` for each key it was told to send.
  */
-import { blockInstants, istParts } from "./time";
-import type { BlockType, FacilityHours } from "./schedule";
-import type { PlanInterval } from "./dayplan";
+import { blockInstants, istParts } from "./time.ts";
+import type { BlockType, FacilityHours } from "./schedule.ts";
+import type { PlanInterval } from "./dayplan.ts";
 
 export type ReminderLevel = "must" | "nudge" | "pace" | "none";
 export type ReminderKind =
