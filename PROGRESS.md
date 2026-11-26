@@ -2,8 +2,8 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Phase 0 FULLY COMPLETE (incl. CI coverage of `supabase/functions`, T0.6). Start Phase 1 **T1.2** (schedule tables + seed templates) — best in a fresh session. T1.1 already DONE.
-**Current phase:** 0
+**Next action:** Phase 0 verified complete (gate re-run green: typecheck + lint + 67 tests + build; `phase-0` on HEAD). **T1.2 IN PROGRESS** — builder implementing the four schedule tables + §4 defaults (shared TS single source + per-user app seed). Then checker, then hosted `supabase db push` (Needs you).
+**Current phase:** 1
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
@@ -19,7 +19,10 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
-- **Last tool:** Claude Code (planner). **PHASE 0 FULLY COMPLETE (26 Nov)** — T0.1a–T0.6 all DONE; push verified end-to-end on the S23 (delivery + Done/Snooze). T0.6 added `supabase/functions` as a pnpm workspace package, so `pnpm -r test` now runs its 35 Vitest tests; `phase-0` tag moved to the T0.6 commit. Next: Phase 1 **T1.2** (T1.1 already DONE). NB: `supabase/functions/ambient.d.ts` declares a global `Buffer` for the Node typecheck of the tests — it could mask a stray `Buffer` use in the Deno entrypoints (nothing uses it now); Deno-runtime typechecking of `*/index.ts` is a documented gap.
+- **Last tool:** Claude Code (planner). **T1.2 IN PROGRESS** (started this session). Phase 0 re-verified green before starting (typecheck + lint + 67 tests + build; clean tree; `phase-0` on HEAD `6456767`). State: builder about to implement.
+- **T1.2 plan (agreed with user):** 4 per-user RLS tables `day_templates`/`template_blocks`/`days`/`schedule_items` in a new migration `20261126020000_schedule_core.sql`, matching the RLS pattern in `20261126000000_setup.sql`. §4 defaults live ONCE in `shared/schedule.ts` (typed consts + Vitest); the APP seeds them per-user on first sign-in (`app/src/seed.ts`, wired into `Auth.tsx`), merging facility hours into `settings.data.facility_hours`. Block times stored as `HH:MM` text so T1.3 can pass them to `blockInstants`.
+- **GOTCHA — no local DB:** Docker is NOT available on this host, so `supabase start`/`db reset`/`db lint` can't run. Local validation = the repo gate only. **The hosted `supabase db push` (Needs you) is the real DB check** — user chose "apply to hosted now". `days`/`schedule_items` are created empty (populated in T1.3/T1.4).
+- **Prior-phase NB (kept):** `supabase/functions/ambient.d.ts` declares a global `Buffer` for the Node typecheck of its tests; Deno-runtime typechecking of `*/index.ts` is a documented gap. VAPID pair + Resend SMTP are live (see DECISIONS).
 - **T1.1 DONE (committed):** `shared/time.ts` + `shared/time.test.ts`; `shared/index.ts` re-exports. Fixed +5:30 IST offset (no deps, no I/O, portable to Deno Edge Functions). API: `istParts`, `pulseDayKey`, `startOfPulseDay`, `pulseDayRange` (half-open), `currentPulseDayKey`, `blockInstants`, consts `IST_TZ`/`IST_OFFSET_MINUTES`/`DAY_BOUNDARY_HOUR`. Checker PASS (all stages exit 0; shared 20 tests incl. fake-clock, app 12). `IST_TZ` currently unused (harmless).
 - **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
 - **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse set; `main` pushed by user. **T0.4d fix is now DEPLOYED and VERIFIED LIVE** — in-browser on pulse-tau-liard: sw.js 4794 B, install uses `addAll([...])`, the SW registers and ACTIVATES, `serviceWorker.ready` resolves (previously went redundant). Remaining: the S23 functional push test (enroll + test notification + Done/Snooze) — user step. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
@@ -47,7 +50,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T1.1 | `shared/time.ts`: IST helpers, 4 AM day boundary, block maths; tests with a fake clock across midnight | §4 Day boundary, §14 Rules | DONE |
-| T1.2 | Tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS); seed weekday and weekend templates exactly from the §4 table, plus facility hours (mess, gym) in settings | §4 | TODO |
+| T1.2 | Tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS); seed weekday and weekend templates exactly from the §4 table, plus facility hours (mess, gym) in settings | §4 | IN PROGRESS |
 | T1.3 | `shared/dayplan.ts`: template → schedule items for a date, including the news-reading placement rule; tests | §4 | TODO |
 | T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | TODO |
 | T1.5 | Habit checklist, meals (with where: Mess/Outside/Ordered in), water (+½/+1, gym water separate); Dexie offline queue with sync dot | §6, §9 Water, §10 Meal link, §13 Interaction | TODO |
