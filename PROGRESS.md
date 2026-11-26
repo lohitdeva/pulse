@@ -2,11 +2,13 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Confirm the **Done / Snooze** notification buttons on the S23 (exercises the `notification-action` function). If they round-trip, T0.5 device acceptance is complete → start Phase 1 T1.2.
+**Next action:** Phase 0 COMPLETE — run the full-suite gate and tag `phase-0`. Then start Phase 1 **T1.2** (schedule tables + seed templates; T1.1 already DONE).
 **Current phase:** 0
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
+
+**✅ Phase 0 push acceptance COMPLETE (26 Nov):** install, sign-in (via Resend custom SMTP), push delivery, and the Done/Snooze actions are all verified on the S23. No user action pending. (The numbered steps below are the history that got us here.)
 
 1. ✅ **Done — the T0.4d fix is deployed and verified live** (sw.js now 4794 B; the service worker registers and activates, `serviceWorker.ready` resolves — confirmed in a real browser engine, 26 Nov). On the S23, fully close Pulse and reopen it (or clear the app's site data) so the new worker installs, then run the enrollment + notification test below.
 2. On the S23, open https://pulse-tau-liard.vercel.app/ in Chrome. Reinstall/refresh Pulse from the Chrome menu and launch it from the home screen.
@@ -17,7 +19,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
-- **Last tool:** Claude Code (planner).
+- **Last tool:** Claude Code (planner). **PHASE 0 COMPLETE (26 Nov)** — T0.1a–T0.5 all DONE; push verified end-to-end on the S23 (delivery + Done/Snooze recorded). Next: Phase 1 **T1.2** (T1.1 already DONE).
 - **T1.1 DONE (committed):** `shared/time.ts` + `shared/time.test.ts`; `shared/index.ts` re-exports. Fixed +5:30 IST offset (no deps, no I/O, portable to Deno Edge Functions). API: `istParts`, `pulseDayKey`, `startOfPulseDay`, `pulseDayRange` (half-open), `currentPulseDayKey`, `blockInstants`, consts `IST_TZ`/`IST_OFFSET_MINUTES`/`DAY_BOUNDARY_HOUR`. Checker PASS (all stages exit 0; shared 20 tests incl. fake-clock, app 12). `IST_TZ` currently unused (harmless).
 - **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
 - **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse set; `main` pushed by user. **T0.4d fix is now DEPLOYED and VERIFIED LIVE** — in-browser on pulse-tau-liard: sw.js 4794 B, install uses `addAll([...])`, the SW registers and ACTIVATES, `serviceWorker.ready` resolves (previously went redundant). Remaining: the S23 functional push test (enroll + test notification + Done/Snooze) — user step. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
@@ -38,7 +40,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | T0.4c | Repair stalled S23 push enrollment | §6, §14 Push | DONE |
 | T0.4d | Restore production worker activation | §14 Push | DONE |
 | T0.4e | Web Push 502 on Supabase Edge Runtime: polyfill `Uint8Array.fromBase64`/`toBase64` (Deno 2.1.4 lacks them; `@daaku/webpush` needs them) | §14 Push | DONE |
-| T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | WAITING ON USER |
+| T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | DONE |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
 | ID | Ticket | PRD | Status |
@@ -137,3 +139,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 · Claude Code · T0.4d + T1.1 DONE · T0.4d: deduped SW precache `addAll` (root-caused in a real browser) + dark manifest; verified on local build; user deploy + S23 test pending. T1.1: `shared/time.ts` IST + 4 AM day boundary with fake-clock tests. Both checker PASS. Stopped after T1.1 per plan; next is T1.2.
 - 2026-11-26 · Claude Code · Repo pushed to github.com/lohitdeva/pulse (user); T0.4d fix deployed to Vercel and VERIFIED LIVE in-browser (sw.js 4794 B, SW now activates). S23 functional push test still pending.
 - 2026-11-26 · Claude Code · Auth fixed via Resend SMTP (rate-limit + DKIM). T0.4e DONE: polyfilled `Uint8Array.fromBase64`/`toBase64` for the Supabase edge runtime (Deno 2.1.4) so `send-test-push` stops throwing; checker PASS. **Test push DELIVERED on the S23 — push chain works end-to-end.** Remaining: Done/Snooze buttons, then T0.5 done → Phase 1.
+- 2026-11-26 · Claude Code · T0.5 ACCEPTED (Done + Snooze verified on the S23). **PHASE 0 COMPLETE** — T0.1a–T0.5 all DONE. Running the full-suite gate + tagging `phase-0`. Next session: Phase 1 T1.2.
