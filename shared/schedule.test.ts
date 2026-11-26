@@ -94,6 +94,20 @@ describe("templates", () => {
     );
   });
 
+  it("carries the news placement markers in both templates", () => {
+    for (const template of DEFAULT_TEMPLATES) {
+      const breakfast = template.blocks.filter((b) => b.meta?.newsOverlap === true);
+      const fillable = template.blocks.filter((b) => b.meta?.fillable === true);
+      expect(breakfast.map((b) => [b.startHHMM, b.endHHMM])).toEqual([
+        ["08:45", "09:20"],
+      ]);
+      expect(fillable.map((b) => [b.startHHMM, b.endHHMM])).toEqual([
+        ["09:30", "17:15"],
+      ]);
+      expect(template.blocks.filter((b) => b.meta?.newsMinutes)).toHaveLength(1);
+    }
+  });
+
   it("DEFAULT_TEMPLATES lists weekday then weekend", () => {
     expect(DEFAULT_TEMPLATES.map((t) => t.key)).toEqual(["weekday", "weekend"]);
   });

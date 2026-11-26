@@ -82,6 +82,7 @@ const WEEKDAY_SPECS: BlockSpec[] = [
     endHHMM: "09:20",
     blockType: "must_do",
     title: "Breakfast at the mess (read Inshorts; Mint/WSJ if time)",
+    meta: { newsOverlap: true },
   },
   {
     startHHMM: null,
@@ -96,6 +97,7 @@ const WEEKDAY_SPECS: BlockSpec[] = [
     endHHMM: "17:15",
     blockType: "must_do",
     title: "Classes from the timetable; free slots → study/reading/tasks",
+    meta: { fillable: true },
   },
   {
     startHHMM: "13:00",
