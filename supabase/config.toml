@@ -39,3 +39,6 @@ verify_jwt = true
 
 [functions.notification-action]
 verify_jwt = false
+
+[functions.ingest-timetable]
+verify_jwt = false

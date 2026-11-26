@@ -1,4 +1,6 @@
-import { istDateTimeLocalToUtc } from "../time";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- Deno needs the explicit TypeScript extension.
+// @ts-ignore
+import { istDateTimeLocalToUtc } from "../time.ts";
 
 /** Raw `getDisplayValues()` rows and A1 ranges from the Schedule sheet bridge. */
 export interface TimetableBridgePayload {
