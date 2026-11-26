@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T1.1 — `shared/time.ts` IST helpers + 4 AM day boundary with fake-clock tests. (T0.4d fix landed and verified on a local build; user deploy + S23 push test pending under Needs you.)
+**Next action:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS) + seed weekday/weekend templates from the §4 table and facility hours (mess, gym) into settings. (T0.4d deploy + S23 push test still pending under Needs you.)
 **Current phase:** 0
 
 ## Needs you
@@ -18,11 +18,9 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
 - **Last tool:** Claude Code (planner).
-- **T0.4d DONE (committed):** `app/src/sw.ts` install now `cache.addAll([...precacheUrls])` (the deduped Set); manifest `theme_color`/`background_color` → `#0b0e14`. Checker PASS (typecheck/lint/test/build all exit 0; app tests 12/12, shared 1/1).
-- **Root cause (confirmed in a real browser):** VitePWA injected the manifest icons + webmanifest AND the glob re-captured them, so `pulse-192.png`, `pulse-512.png`, `manifest.webmanifest` appeared twice → `addAll` rejected `InvalidStateError: duplicate requests` → worker never activated. All 10 URLs were 200 (prior "failed URL" lead was wrong).
-- **Verified on the local prod build:** the shipped 10-entry `addAll` fails; the fixed `addAll([...precacheUrls])` succeeds (10→7 cached). Built `sw.js` contains the fix. (A SW can't be *registered* against `vite preview` inside the browser pane — environment limit; real activation confirms on the HTTPS deploy.)
-- **User-gated:** deploy the new build, then re-run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
-- **Current ticket:** T1.1 — `shared/time.ts` (IST, 4 AM day boundary, fake-clock tests). `shared/` is flat (`index.ts` is `export {}`); add `shared/time.ts` + `shared/time.test.ts`, re-export from index. Read only PRD §4 + §14.
+- **T1.1 DONE (committed):** `shared/time.ts` + `shared/time.test.ts`; `shared/index.ts` re-exports. Fixed +5:30 IST offset (no deps, no I/O, portable to Deno Edge Functions). API: `istParts`, `pulseDayKey`, `startOfPulseDay`, `pulseDayRange` (half-open), `currentPulseDayKey`, `blockInstants`, consts `IST_TZ`/`IST_OFFSET_MINUTES`/`DAY_BOUNDARY_HOUR`. Checker PASS (all stages exit 0; shared 20 tests incl. fake-clock, app 12). `IST_TZ` currently unused (harmless).
+- **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
+- **Next ticket:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` with RLS; seed weekday + weekend templates from the §4 table and facility hours (mess, gym) into settings. Read PRD §4. Use `shared/time.ts` for time math. (Supabase/migrations — mind whether DB access needs the user.)
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -41,7 +39,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
-| T1.1 | `shared/time.ts`: IST helpers, 4 AM day boundary, block maths; tests with a fake clock across midnight | §4 Day boundary, §14 Rules | IN PROGRESS |
+| T1.1 | `shared/time.ts`: IST helpers, 4 AM day boundary, block maths; tests with a fake clock across midnight | §4 Day boundary, §14 Rules | DONE |
 | T1.2 | Tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS); seed weekday and weekend templates exactly from the §4 table, plus facility hours (mess, gym) in settings | §4 | TODO |
 | T1.3 | `shared/dayplan.ts`: template → schedule items for a date, including the news-reading placement rule; tests | §4 | TODO |
 | T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | TODO |
@@ -132,4 +130,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 — T0.4a/b passed, backend and PWA deployed. T0.5 software checks passed. Production routes, bundled public keys, worker, manifest and icons verified via HTTP. S23 install, sign-in, delivery and action receipts pending.
 - 2026-11-26 — T0.4c fixed unbounded enrollment waits and preserved the permission gesture. Verified updated production bundle and worker. S23 retry pending; no subscription existed at diagnosis.
 - 2026-11-26 11:05 · Claude (chat) · no tickets · Added CLAUDE.md, `.claude/agents/` and shared handoff rules so Codex and Claude Code can alternate. Next session continues T0.4d or parks it.
-- 2026-11-26 · Claude Code · T0.4d DONE: root-caused in a real browser (duplicate precache URLs → `addAll` rejects), deduped `addAll` + dark manifest colors; checker PASS; fix verified on local build. User deploy + S23 test pending. Continuing to T1.1.
+- 2026-11-26 · Claude Code · T0.4d + T1.1 DONE · T0.4d: deduped SW precache `addAll` (root-caused in a real browser) + dark manifest; verified on local build; user deploy + S23 test pending. T1.1: `shared/time.ts` IST + 4 AM day boundary with fake-clock tests. Both checker PASS. Stopped after T1.1 per plan; next is T1.2.
