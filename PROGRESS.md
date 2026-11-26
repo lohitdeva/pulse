@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** **T1.3 DONE** (`shared/dayplan.ts` + tests; builder+checker PASS; gate green, 89 tests). Next is **T1.4** — the Today screen (Now/Next card, score-card placeholder, timeline) per §13; first UI ticket of Phase 1. It consumes `buildDayPlan` (done) and the seeded templates (live on hosted). Read PRD §13 Today screen.
+**Next action:** T1.1–T1.3 DONE. **T1.4 IN PROGRESS** — builder implementing the Today screen (header, Now/Next card, score-card placeholder, timeline) + BottomTabs shell per §13, rendering `buildDayPlan` from the shared default template (no DB fetch this ticket). Then checker + a browser preview at `/dev`.
 **Current phase:** 1
 
 ## Needs you
@@ -15,7 +15,8 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
-- **Last tool:** Claude Code (planner). **T1.2 DONE & LIVE** and **T1.3 DONE** this session; builder+checker PASS on both; planner re-ran the gate green (**89 tests**: shared 36, app 18, functions 35). Clean tree before this commit. Next: **T1.4** (Today screen, first UI ticket).
+- **Last tool:** Claude Code (planner). T1.1–T1.3 DONE (89 tests green). **T1.4 IN PROGRESS** — Today screen UI.
+- **T1.4 scope/decisions:** presentational `app/src/Today.tsx` (header w/ date+greeting+sync dot+Settings; Now/Next card w/ time-left bar + Done/Start-timer + next block; score-card PLACEHOLDER via `RingGauge` — scoring is Phase 8; vertical timeline of the day's items; `BottomTabs` shell, non-Today tabs = "Coming soon"). Data: `buildDayPlan(WEEKDAY|WEEKEND default template by today's IST weekday, currentPulseDayKey())` — NO DB fetch this ticket (DB-backed templates deferred to when template editing lands). Times formatted via `shared/time.ts` `istParts` (IST regardless of device tz). New pure helper `nowNext(plan, now)` in `shared/dayplan.ts` (+ tests). Reuse the T0.2 UI kit (`Card`/`RingGauge`/`StatTile`/`ListRow`/`BottomTabs`) + `tokens.css`. Preview without auth: also render Today with sample data in `DevGallery` (`/dev`). Settings (gear) opens a `Sheet` with the existing `PushSettings` + Sign out so push enrollment stays reachable.
 - **T1.2 recap:** migration `20261126020000_schedule_core.sql` (4 per-user RLS tables; `days`/`schedule_items` EMPTY, filled in T1.3/T1.4). §4 defaults in `shared/schedule.ts`; `app/src/seed.ts` idempotent per-user seed wired into `Auth.tsx`. Applied to hosted + redeployed; seed live.
 - **T1.3 recap:** `shared/dayplan.ts` — `buildDayPlan(template, dayKey, busy=[]) -> DayPlan { dayKey, items: ScheduleItem[], newsLeftoverMinutes }`, pure, uses `blockInstants`. News items `blockType:'habit'`, `meta.newsReading`. Blocks found by meta markers (`newsMinutes`/`newsOverlap`/`fillable`), added to `shared/schedule.ts` in BOTH templates. "Study block 1" keeps null `startAt` (sorts by `endAt` 19:30). Two non-blocking test-strength leads from the checker: the cross-midnight sort test asserts ascending order + Lights-out-last but not Call/Wind-down explicitly; the weekend test only checks study-minutes < weekday — tighten if convenient in a later pass.
 - **GOTCHA (kept):** Docker unavailable here (no local Supabase); hosted migrations via `supabase db push --remote`. **Deploys: Git auto-deploy is now ON** — a push to `main` deploys production automatically (verified); `vercel --prod` is the manual fallback. Root `pnpm format:check` fails on PRE-EXISTING `shared/time.ts`/`time.test.ts` (not in the `-r` gate) — tidy-up lead.
@@ -50,7 +51,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | T1.1 | `shared/time.ts`: IST helpers, 4 AM day boundary, block maths; tests with a fake clock across midnight | §4 Day boundary, §14 Rules | DONE |
 | T1.2 | Tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS); seed weekday and weekend templates exactly from the §4 table, plus facility hours (mess, gym) in settings | §4 | DONE |
 | T1.3 | `shared/dayplan.ts`: template → schedule items for a date, including the news-reading placement rule; tests | §4 | DONE |
-| T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | TODO |
+| T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | IN PROGRESS |
 | T1.5 | Habit checklist, meals (with where: Mess/Outside/Ordered in), water (+½/+1, gym water separate); Dexie offline queue with sync dot | §6, §9 Water, §10 Meal link, §13 Interaction | TODO |
 | T1.6 | Manual tasks: basic CRUD with the §5 fields | §5 Task fields | TODO |
 
