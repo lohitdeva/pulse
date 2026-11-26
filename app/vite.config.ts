@@ -12,6 +12,7 @@ export default defineConfig({
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
+      scope: "/",
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,webmanifest}"],
       },
@@ -25,6 +26,21 @@ export default defineConfig({
         background_color: "#f7f7f5",
         display: "standalone",
         start_url: "/",
+        scope: "/",
+        icons: [
+          {
+            src: "/pulse-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/pulse-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
       },
     }),
   ],

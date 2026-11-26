@@ -1,0 +1,10 @@
+{
+  "framework": "vite",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @pulse/app build",
+  "outputDirectory": "app/dist",
+  "rewrites": [
+    { "source": "/dev", "destination": "/index.html" },
+    { "source": "/dev/:path*", "destination": "/index.html" }
+  ]
+}

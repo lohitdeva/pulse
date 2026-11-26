@@ -2,13 +2,16 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Deploy T0.5 and verify on S23
+**Next action:** Verify T0.5 on S23, check backend receipts, then run the phase-end checker and tag phase-0.
 **Current phase:** 0
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-_(Nothing pending for Supabase authentication.)_
+1. On the S23, open https://pulse-tau-liard.vercel.app/ in Chrome. Install Pulse from the Chrome menu and launch it from the home screen.
+2. Sign in with your Pulse email. Open the newest magic link on the S23 in the same Chrome profile, then return to the installed app.
+3. Under Notifications, tap **Enable push on this device** and allow notifications. Tap **Send test notification** and tap **Done** on the Android notification.
+4. Send a second test and tap **Snooze 10 min**. Expand the notification if the buttons are collapsed. Tell the planner the outcome for each button or the exact error so it can check the backend receipts.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -20,7 +23,7 @@ _(Nothing pending for Supabase authentication.)_
 | T0.3 | Supabase init: CLI, migrations, `settings` + `push_subscriptions` with RLS, magic-link sign-in screen, sign-ups disabled (user creates the project and pastes keys) | §14 | DONE |
 | T0.4a | Web Push backend, VAPID setup and authenticated test push actions | §6 actions, §14 Push | DONE |
 | T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | DONE |
-| T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | IN PROGRESS |
+| T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | WAITING ON USER |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
 | ID | Ticket | PRD | Status |
@@ -113,3 +116,4 @@ _(One line per session: date, phase, tickets done, where it stopped.)_
 - 2026-11-26 — T0.3 verified and committed. Hosted migration matches local history, email confirmed, subsequent sign-in recorded, public sign-ups disabled. Local callback uses port 5173.
 
 - 2026-11-26 — T0.2a corrected gallery typography, chip and row proportions. Verified at 360, 390 and 1280 px, including sheet dismissal, focus return and tab selection.
+- 2026-11-26 — T0.4a/b passed, backend and PWA deployed. T0.5 software checks passed. Production routes, bundled public keys, worker, manifest and icons verified via HTTP. S23 install, sign-in, delivery and action receipts pending.
