@@ -2,20 +2,22 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Implement and verify T2.2 before college-account installation.
+**Next action:** T2.2 WAITING ON USER: install the college script; then begin T2.3 ingest before the first live sync.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-No user step pending. Both logging and tasks migrations were verified in the hosted migration ledger.
+1. Under your college Google account, create a standalone Apps Script project and copy in `bridges/college.gs`.
+2. In Project Settings → Script Properties, add `COLLEGE_SPREADSHEET_ID` for the view-only timetable. See `bridges/README.md` for setup details.
+3. Confirm the script is saved. After T2.3 deploys, complete the endpoint and bearer properties, manual sync and trigger setup per the README.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
 ## Handoff notes
 
 - Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
-- T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 in progress.
+- T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 implementation passed offline checks; waiting for college-account setup.
 - Main auto-deploys to production. Hosted schema is current.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -53,7 +55,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T2.1 | `shared/timetable/parser.ts`: raw grid + merged ranges → Section C classes; tests from `docs/reference/timetable-fixture.json` covering every §4 cell variant, plus a synthetic exam cell → Exam item | §4 | DONE |
-| T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | IN PROGRESS |
+| T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | WAITING ON USER |
 | T2.3 | `ingest-timetable` function: auth, parse, snapshot, diff, upsert `classes`, change alerts; save the real payload as a second fixture | §4, §14 | TODO |
 | T2.4 | Classes on Today and the timeline; attendance prompt (Attended/Missed/Medical/Cancelled); cancelled classes struck through with Restore (manual) and auto-restore when the sheet re-lists them; move and add-extra-class overrides | §4 Class handling, Cancelled classes, Manual changes | TODO |
 
@@ -146,4 +148,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 · Claude Code · Split T1.5 → **T1.5a DONE** — logging migration (item_logs/meal_logs/water_logs, RLS) + Dexie offline queue/sync (drain-loop flush, stop-on-error, pending-count hook → Today sync dot). Builder+checker (1 hardening round: mid-flush overlap + throw test). Gate green, 114 tests. Migration not yet on hosted (Needs you, before T1.5b). Next: T1.5b (logging UIs).
 
 - 2026-11-26 17:25 · Codex · Completed T1.5b–c, T1.6a–c and T1.7. Hosted migrations verified, all 147 tests passed, Chrome CRUD smoke passed. Stopped at the Phase 1 boundary.
-- 2026-11-26 23:06 · Codex · T2.1 done · T2.2 in progress.
+- 2026-11-26 23:06 · Codex · T2.1 done · T2.2 implementation passed offline checks; waiting for college-account setup.
