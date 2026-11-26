@@ -12,6 +12,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { flushQueue, usePendingCount } from "./offline/queue";
 import { PushSettings } from "./PushSettings";
 import { seedDefaults } from "./seed";
 import { dateLabelFor, greetingFor, Today } from "./Today";
@@ -77,6 +78,18 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   const [activeTab, setActiveTab] = useState<TabName>("Today");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const pending = usePendingCount();
+
+  useEffect(() => {
+    const flush = () => {
+      void flushQueue(client).catch(() => {
+        // Offline queue keeps its rows; the next trigger retries.
+      });
+    };
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, [client]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 30_000);
@@ -97,6 +110,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
           now={now}
           greeting={greetingFor(istParts(now).hour, DISPLAY_NAME)}
           dateLabel={dateLabelFor(now)}
+          syncPending={pending > 0}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : (
