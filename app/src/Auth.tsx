@@ -19,6 +19,7 @@ import { MealsCard, WaterCard } from "./LoggingCards";
 import { flushQueue, usePendingCount } from "./offline/queue";
 import { PushSettings } from "./PushSettings";
 import { seedDefaults } from "./seed";
+import { TaskPlan } from "./TaskPlan";
 import { dateLabelFor, greetingFor, Today } from "./Today";
 import { useDayLogs } from "./useDayLogs";
 import { BottomTabs, Sheet, type TabName } from "./ui";
@@ -117,29 +118,33 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   );
 
   return (
-    <main className="today-shell">
+    <div className="today-shell">
       {activeTab === "Today" ? (
-        <Today
-          plan={plan}
-          now={now}
-          greeting={greetingFor(istParts(now).hour, DISPLAY_NAME)}
-          dateLabel={dateLabelFor(now)}
-          syncPending={pending > 0}
-          onOpenSettings={() => setSettingsOpen(true)}
-          habitStatuses={habitStatuses}
-          onHabitStatusChange={setItemStatus}
-          logging={
-            <>
-              <WaterCard totals={waterTotals(logs.waterLogs)} onAdd={addWater} />
-              <MealsCard summary={mealsSummary(logs.mealLogs)} onSet={setMeal} />
-            </>
-          }
-        />
+        <main>
+          <Today
+            plan={plan}
+            now={now}
+            greeting={greetingFor(istParts(now).hour, DISPLAY_NAME)}
+            dateLabel={dateLabelFor(now)}
+            syncPending={pending > 0}
+            onOpenSettings={() => setSettingsOpen(true)}
+            habitStatuses={habitStatuses}
+            onHabitStatusChange={setItemStatus}
+            logging={
+              <>
+                <WaterCard totals={waterTotals(logs.waterLogs)} onAdd={addWater} />
+                <MealsCard summary={mealsSummary(logs.mealLogs)} onSet={setMeal} />
+              </>
+            }
+          />
+        </main>
+      ) : activeTab === "Plan" ? (
+        <TaskPlan client={client} userId={userId} />
       ) : (
-        <section className="coming-soon" aria-labelledby="coming-soon-title">
+        <main className="coming-soon" aria-labelledby="coming-soon-title">
           <h1 id="coming-soon-title">{activeTab}</h1>
           <p>Coming soon</p>
-        </section>
+        </main>
       )}
 
       <BottomTabs activeTab={activeTab} onChange={setActiveTab} />
@@ -162,7 +167,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
           {error ? <p role="alert">{error}</p> : null}
         </div>
       </Sheet>
-    </main>
+    </div>
   );
 }
 

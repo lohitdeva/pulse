@@ -2,8 +2,8 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Finish T1.6c browser smoke, then close and push Phase 1.
-**Current phase:** 1
+**Next action:** Phase 1 complete. Start Phase 2 in a fresh session with T2.1.
+**Current phase:** 1 complete; Phase 2 next
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
@@ -14,9 +14,9 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 
 ## Handoff notes
 
-- All phase gates passed with 147 tests, including a fake-clock full day through midnight and the 04:00 rollover.
-- Finish T1.6c browser smoke, then close and push Phase 1.
-- Main auto-deploys to production. Apply pending hosted migrations before push.
+- Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
+- Phase 1 complete. Start Phase 2 in a fresh session with T2.1.
+- Main auto-deploys to production. Hosted schema is current.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -46,7 +46,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | DONE |
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete component | §5 Task fields | DONE |
-| T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | IN PROGRESS |
+| T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | DONE |
 | T1.7 | Phase acceptance regression: fake-clock Now/Next across midnight and 4 AM rollover | §15 Phase 1 | DONE |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
@@ -145,4 +145,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 · Claude Code · **T1.4 DONE** — Today screen (`app/src/Today.tsx` + `SignedInShell`): header, Now/Next card, score placeholder, timeline; renders `buildDayPlan` from the shared default template. Builder+checker (1 fix round: name hardcoding + helper tests), planner-previewed `/dev` in browser. Gate green, 105 tests. Next: T1.5.
 - 2026-11-26 · Claude Code · Split T1.5 → **T1.5a DONE** — logging migration (item_logs/meal_logs/water_logs, RLS) + Dexie offline queue/sync (drain-loop flush, stop-on-error, pending-count hook → Today sync dot). Builder+checker (1 hardening round: mid-flush overlap + throw test). Gate green, 114 tests. Migration not yet on hosted (Needs you, before T1.5b). Next: T1.5b (logging UIs).
 
-- 2026-11-26 17:25 · Codex · Checking interrupted T1.5b, then T1.5c and T1.6.
+- 2026-11-26 17:25 · Codex · Completed T1.5b–c, T1.6a–c and T1.7. Hosted migrations verified, all 147 tests passed, Chrome CRUD smoke passed. Stopped at the Phase 1 boundary.
