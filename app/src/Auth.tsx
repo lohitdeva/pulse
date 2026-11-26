@@ -1,6 +1,7 @@
 import { createClient, type Session } from "@supabase/supabase-js";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { PushSettings } from "./PushSettings";
+import { seedDefaults } from "./seed";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey =
@@ -55,6 +56,16 @@ export function Auth() {
   const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const seededRef = useRef(false);
+  const userId = session?.user.id;
+
+  useEffect(() => {
+    if (!supabase || !userId || seededRef.current) return;
+    seededRef.current = true;
+    seedDefaults(supabase, userId).catch(() => {
+      // Seeding must never block the UI; it retries on the next mount.
+    });
+  }, [userId]);
 
   useEffect(() => {
     if (!supabase) {
