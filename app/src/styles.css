@@ -128,3 +128,20 @@ a:focus-visible {
     margin-bottom: 24px;
   }
 }
+
+.now-class,
+.next-class {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+}
+
+.alerts-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.timeline-cancelled .timeline-name {
+  text-decoration: line-through;
+  opacity: 0.6;
+}

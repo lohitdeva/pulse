@@ -3,6 +3,7 @@ import {
   buildDayPlan,
   nowNext,
   templateForDayKey,
+  type PlanClass,
   type ScheduleItem,
 } from "./dayplan";
 import { WEEKDAY_TEMPLATE, WEEKEND_TEMPLATE } from "./schedule";
@@ -256,5 +257,66 @@ describe("templateForDayKey", () => {
   it("uses the weekend template on Saturday and Sunday", () => {
     expect(templateForDayKey("2026-11-28")).toBe(WEEKEND_TEMPLATE); // Saturday
     expect(templateForDayKey("2026-11-29")).toBe(WEEKEND_TEMPLATE); // Sunday
+  });
+});
+
+describe("buildDayPlan with timetable classes", () => {
+  const cls = (
+    id: string,
+    from: string,
+    to: string,
+    over: Partial<PlanClass> = {},
+  ): PlanClass => {
+    const { start, end } = blockInstants(DAY, from, to);
+    return {
+      id,
+      kind: "class",
+      title: "Marketing",
+      startAt: start,
+      endAt: end,
+      course: "MKT",
+      room: "R12",
+      session: 3,
+      professor: null,
+      cancelled: false,
+      ...over,
+    };
+  };
+
+  it("places class items in start order and news avoids them", () => {
+    const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY, [], [
+      cls("b", "11:15", "12:45"),
+      cls("a", "09:30", "11:00"),
+    ]);
+    const classItems = plan.items.filter((i) => i.source === "class");
+    expect(classItems.map((i) => i.meta.classId)).toEqual(["a", "b"]);
+    expect(plan.items.map(key)).toEqual([...plan.items.map(key)].sort((x, y) => x - y));
+    const placed = news(plan.items);
+    expect(placed.map((i) => i.meta.minutes)).toEqual([15, 25]);
+    for (const n of placed) {
+      for (const c of classItems) {
+        expect(n.startAt!.getTime() >= c.endAt!.getTime() || n.endAt!.getTime() <= c.startAt!.getTime()).toBe(true);
+      }
+    }
+  });
+
+  it("cancelled classes stay listed but are not busy and never current/next", () => {
+    const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY, [], [
+      cls("x", "09:30", "17:00", { cancelled: true }),
+    ]);
+    expect(plan.items.some((i) => i.meta.classId === "x" && i.meta.cancelled === true)).toBe(true);
+    expect(plan.newsLeftoverMinutes).toEqual({});
+    const mid = nowNext(plan, blockInstants(DAY, "10:00", "10:00").start);
+    expect(mid.current?.meta.classId).not.toBe("x");
+    expect(mid.next?.meta.classId).not.toBe("x");
+  });
+
+  it("Now picks the class when the clock is inside it", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-26T10:00:00+05:30"));
+    const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY, [], [cls("a", "09:30", "11:00")]);
+    const { current } = nowNext(plan, new Date());
+    expect(current?.source).toBe("class");
+    expect(current?.meta.classId).toBe("a");
   });
 });

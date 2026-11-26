@@ -22,10 +22,25 @@ export interface ScheduleItem {
   templateBlockSortOrder: number | null;
   title: string;
   blockType: BlockType;
-  source: "template";
+  source: "template" | "class";
   startAt: Date | null;
   endAt: Date | null;
   meta: Record<string, unknown>;
+}
+
+/** A real timetable class, already resolved to its effective times and title. */
+export interface PlanClass {
+  id: string;
+  kind: "class" | "exam" | "event";
+  title: string;
+  startAt: Date;
+  endAt: Date;
+  course: string | null;
+  room: string | null;
+  session: number | null;
+  professor: string | null;
+  /** Cancelled classes stay on the timeline (struck through) but are not busy. */
+  cancelled: boolean;
 }
 
 export interface DayPlan {
@@ -115,6 +130,27 @@ function blockToItem(block: TemplateBlock, dayKey: string): ScheduleItem {
   };
 }
 
+function classToItem(c: PlanClass): ScheduleItem {
+  return {
+    sortOrder: 0,
+    templateBlockSortOrder: null,
+    title: c.title,
+    blockType: "fixed",
+    source: "class",
+    startAt: c.startAt,
+    endAt: c.endAt,
+    meta: {
+      classId: c.id,
+      kind: c.kind,
+      course: c.course,
+      room: c.room,
+      session: c.session,
+      professor: c.professor,
+      cancelled: c.cancelled,
+    },
+  };
+}
+
 function sortKey(item: ScheduleItem): number {
   return (item.startAt ?? item.endAt)?.getTime() ?? Number.POSITIVE_INFINITY;
 }
@@ -123,7 +159,13 @@ export function buildDayPlan(
   template: DayTemplate,
   dayKey: string,
   busy: PlanInterval[] = [],
+  classes: PlanClass[] = [],
 ): DayPlan {
+  const activeClasses = classes.filter((c) => !c.cancelled);
+  const allBusy: PlanInterval[] = [
+    ...busy,
+    ...activeClasses.map((c) => ({ start: c.startAt, end: c.endAt })),
+  ];
   const newsBlock = template.blocks.find((b) => b.meta?.newsMinutes);
   const breakfast = template.blocks.find((b) => b.meta?.newsOverlap === true);
   const fillable = template.blocks.find((b) => b.meta?.fillable === true);
@@ -131,6 +173,7 @@ export function buildDayPlan(
   const items: ScheduleItem[] = template.blocks
     .filter((b) => b !== newsBlock)
     .map((b) => blockToItem(b, dayKey));
+  for (const c of classes) items.push(classToItem(c));
 
   const leftover: Record<string, number> = {};
 
@@ -155,7 +198,7 @@ export function buildDayPlan(
         fillable.startHHMM,
         fillable.endHHMM,
       );
-      gaps = freeGaps({ start, end }, busy, breakfastEnd);
+      gaps = freeGaps({ start, end }, allBusy, breakfastEnd);
     }
 
     for (const gap of gaps) {
@@ -216,10 +259,15 @@ export function nowNext(plan: DayPlan, now: Date): NowNext {
   let current: ScheduleItem | null = null;
   let next: ScheduleItem | null = null;
   for (const item of plan.items) {
-    if (!item.startAt) continue;
+    if (!item.startAt || item.meta.cancelled === true) continue;
     const s = item.startAt.getTime();
     if (item.endAt && s <= t && t < item.endAt.getTime()) {
-      if (!current || s > (current.startAt as Date).getTime()) current = item;
+      if (!current) current = item;
+      else {
+        const cs = (current.startAt as Date).getTime();
+        // A real class wins a tie against a template block starting at the same time.
+        if (s > cs || (s === cs && item.source === "class")) current = item;
+      }
     }
     if (s > t && (!next || s < (next.startAt as Date).getTime())) next = item;
   }

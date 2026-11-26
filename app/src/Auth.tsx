@@ -21,6 +21,7 @@ import { PushSettings } from "./PushSettings";
 import { seedDefaults } from "./seed";
 import { TaskPlan } from "./TaskPlan";
 import { dateLabelFor, greetingFor, Today } from "./Today";
+import { busyFromClasses, useDayClasses } from "./classes";
 import { useDayLogs } from "./useDayLogs";
 import { BottomTabs, Sheet, type TabName } from "./ui";
 
@@ -103,9 +104,16 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   }, []);
 
   const dayKey = currentPulseDayKey(now);
+  const { classes, alerts } = useDayClasses(client, dayKey);
   const plan = useMemo(
-    () => buildDayPlan(templateForDayKey(dayKey), dayKey),
-    [dayKey],
+    () =>
+      buildDayPlan(
+        templateForDayKey(dayKey),
+        dayKey,
+        busyFromClasses(classes),
+        classes,
+      ),
+    [dayKey, classes],
   );
   const { logs, addWater, setMeal, setItemStatus } = useDayLogs(
     client,
@@ -123,6 +131,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
         <main>
           <Today
             plan={plan}
+            alerts={alerts}
             now={now}
             greeting={greetingFor(istParts(now).hour, DISPLAY_NAME)}
             dateLabel={dateLabelFor(now)}

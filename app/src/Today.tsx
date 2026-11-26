@@ -6,10 +6,13 @@ import {
   type ItemLogStatus,
   type ScheduleItem,
 } from "@pulse/shared";
+import type { ChangeAlert } from "./classes";
 import { Card, IconChip, RingGauge } from "./ui";
 
 export interface TodayProps {
   plan: DayPlan;
+  /** Unseen timetable change alerts queued during this Pulse day. */
+  alerts?: ChangeAlert[];
   now: Date;
   greeting: string;
   dateLabel: string;
@@ -61,6 +64,20 @@ function itemTitle(item: ScheduleItem): string {
   return isNews(item) ? "News reading" : item.title;
 }
 
+function isCancelled(item: ScheduleItem): boolean {
+  return item.source === "class" && item.meta.cancelled === true;
+}
+
+/** "MKT · Session 4 · R12" for a class item; empty for others. */
+export function classDetail(item: ScheduleItem): string {
+  if (item.source !== "class") return "";
+  const parts: string[] = [];
+  if (typeof item.meta.course === "string" && item.meta.course) parts.push(item.meta.course);
+  if (typeof item.meta.session === "number") parts.push(`Session ${item.meta.session}`);
+  if (typeof item.meta.room === "string" && item.meta.room) parts.push(item.meta.room);
+  return parts.join(" · ");
+}
+
 function timeRange(item: ScheduleItem): string {
   if (item.startAt && item.endAt) return `${formatTime(item.startAt)} – ${formatTime(item.endAt)}`;
   if (item.startAt) return formatTime(item.startAt);
@@ -107,6 +124,7 @@ function GearIcon(): ReactNode {
 
 export function Today({
   plan,
+  alerts = [],
   now,
   greeting,
   dateLabel,
@@ -143,6 +161,7 @@ export function Today({
         {current ? (
           <>
             <h2 className="now-title">{itemTitle(current)}</h2>
+            {classDetail(current) ? <p className="now-class">{classDetail(current)}</p> : null}
             <p className="now-meta">
               <span>{timeRange(current)}</span>
               {current.endAt ? <span className="now-left">{formatLeft(now, current.endAt)}</span> : null}
@@ -175,12 +194,26 @@ export function Today({
             <>
               <span className="next-time">{formatTime(next.startAt)}</span>
               <span className="next-title">{itemTitle(next)}</span>
+              {classDetail(next) ? <span className="next-class">{classDetail(next)}</span> : null}
             </>
           ) : (
             <span className="next-title">Nothing else planned today</span>
           )}
         </div>
       </Card>
+
+      {alerts.length > 0 ? (
+        <Card className="alerts-card" role="group" aria-label="Timetable changes">
+          <p className="now-label">TIMETABLE CHANGES</p>
+          <ul className="alerts-list">
+            {alerts.map((alert) => (
+              <li key={alert.id} className={`alert-${alert.change_type}`}>
+                {alert.summary}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <Card className="score-card" role="group" aria-label="Score">
         <div className="score-ring">
@@ -221,7 +254,7 @@ export function Today({
             return (
               <li
                 key={item.sortOrder}
-                className={`timeline-row timeline-${state}`}
+                className={`timeline-row timeline-${state}${isCancelled(item) ? " timeline-cancelled" : ""}`}
                 aria-current={isCurrent ? "step" : undefined}
               >
                 <span className="timeline-time">
@@ -230,6 +263,12 @@ export function Today({
                 <span className="timeline-dot" aria-hidden="true" />
                 <span className="timeline-copy">
                   <span className="timeline-name">{itemTitle(item)}</span>
+                  {item.source === "class" ? (
+                    <span className="timeline-sub">
+                      {classDetail(item)}
+                      {isCancelled(item) ? " · Cancelled" : ""}
+                    </span>
+                  ) : null}
                   {isNews(item) && minutes !== null ? (
                     <span className="timeline-sub">{minutes} min</span>
                   ) : item.startAt && item.endAt ? (
