@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Wire task editor into signed-in Plan tab.
+**Next action:** Wire signed-in Plan tab, verify CRUD flow, then perform phase acceptance.
 **Current phase:** 1
 
 ## Needs you
@@ -14,8 +14,8 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 
 ## Handoff notes
 
-- Task editor passed review including mobile controls; migrations verified on production.
-- Wire task editor into signed-in Plan tab.
+- T1.6a and T1.6b passed; both hosted migrations are current.
+- Wire signed-in Plan tab, verify CRUD flow, then perform phase acceptance.
 - Main auto-deploys to production. Apply pending hosted migrations before push.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -46,7 +46,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | DONE |
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete component | §5 Task fields | DONE |
-| T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | TODO |
+| T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | IN PROGRESS |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
 | ID | Ticket | PRD | Status |
