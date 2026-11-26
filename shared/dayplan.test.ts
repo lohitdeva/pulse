@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildDayPlan,
   nowNext,
@@ -6,7 +6,7 @@ import {
   type ScheduleItem,
 } from "./dayplan";
 import { WEEKDAY_TEMPLATE, WEEKEND_TEMPLATE } from "./schedule";
-import { blockInstants } from "./time";
+import { blockInstants, currentPulseDayKey } from "./time";
 
 const DAY = "2026-11-26";
 const byTitle = (items: ScheduleItem[], prefix: string) =>
@@ -14,6 +14,10 @@ const byTitle = (items: ScheduleItem[], prefix: string) =>
 const news = (items: ScheduleItem[]) =>
   items.filter((i) => i.meta.newsReading === true);
 const key = (i: ScheduleItem) => (i.startAt ?? i.endAt)!.getTime();
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("buildDayPlan weekday", () => {
   const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY);
@@ -83,8 +87,12 @@ describe("news with classes", () => {
     const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY, busy);
     const items = news(plan.items);
     expect(items.map((i) => i.meta.minutes)).toEqual([15, 25]);
-    expect(items[0]!.startAt).toEqual(blockInstants(DAY, "11:00", "11:15").start);
-    expect(items[1]!.startAt).toEqual(blockInstants(DAY, "12:45", "13:10").start);
+    expect(items[0]!.startAt).toEqual(
+      blockInstants(DAY, "11:00", "11:15").start,
+    );
+    expect(items[1]!.startAt).toEqual(
+      blockInstants(DAY, "12:45", "13:10").start,
+    );
     expect(items[1]!.endAt).toEqual(blockInstants(DAY, "12:45", "13:10").end);
     expect(plan.newsLeftoverMinutes).toEqual({});
   });
@@ -109,7 +117,9 @@ describe("buildDayPlan weekend and determinism", () => {
         (sum, i) =>
           sum +
           (i.endAt!.getTime() -
-            (i.startAt ?? blockInstants(DAY, "18:00", "18:00").start).getTime()) /
+            (
+              i.startAt ?? blockInstants(DAY, "18:00", "18:00").start
+            ).getTime()) /
             60_000,
         0,
       );
@@ -173,6 +183,66 @@ describe("nowNext", () => {
     expect(nowNext(plan, at("20:45")).current?.title).toBe(
       "Freshen up after the gym",
     );
+  });
+});
+
+describe("clock-driven Now / Next acceptance", () => {
+  it("follows the weekday timeline from morning through the next Pulse day", () => {
+    vi.useFakeTimers();
+
+    const at = (instant: string) => {
+      vi.setSystemTime(new Date(instant));
+      const now = new Date();
+      const dayKey = currentPulseDayKey();
+      const template = templateForDayKey(dayKey);
+      const plan = buildDayPlan(template, dayKey);
+      return { dayKey, template, ...nowNext(plan, now) };
+    };
+
+    const pulseStart = at("2026-11-26T04:00:00+05:30");
+    expect(pulseStart.dayKey).toBe("2026-11-26");
+    expect(pulseStart.current).toBeNull();
+    expect(pulseStart.next?.title).toBe("Wake up");
+
+    const morning = at("2026-11-26T07:15:00+05:30");
+    expect(morning.dayKey).toBe("2026-11-26");
+    expect(morning.template).toBe(WEEKDAY_TEMPLATE);
+    expect(morning.current?.title).toBe("Brush and freshen up");
+    expect(morning.next?.title).toBe("Walk (auto-logged from Strava)");
+
+    const noon = at("2026-11-26T12:00:00+05:30");
+    expect(noon.current?.title).toBe(
+      "Classes from the timetable; free slots → study/reading/tasks",
+    );
+    expect(noon.next?.title).toBe("Lunch");
+
+    const evening = at("2026-11-26T19:45:00+05:30");
+    expect(evening.current?.title).toBe("Gym: weigh-in, workout, cardio, abs");
+    expect(evening.next?.title).toBe("Freshen up after the gym");
+
+    const call = at("2026-11-26T23:00:00+05:30");
+    expect(call.current?.title).toBe("Personal call");
+    expect(call.next?.title).toBe(
+      "Wind-down: night check-in, then book reading",
+    );
+
+    const windDown = at("2026-11-27T00:45:00+05:30");
+    expect(windDown.dayKey).toBe("2026-11-26");
+    expect(windDown.current?.title).toBe(
+      "Wind-down: night check-in, then book reading",
+    );
+    expect(windDown.next?.title).toBe("Lights out");
+
+    const sleep = at("2026-11-27T01:15:00+05:30");
+    expect(sleep.dayKey).toBe("2026-11-26");
+    expect(sleep.current).toBeNull();
+    expect(sleep.next).toBeNull();
+
+    const nextPulseDay = at("2026-11-27T04:00:00+05:30");
+    expect(nextPulseDay.dayKey).toBe("2026-11-27");
+    expect(nextPulseDay.template).toBe(WEEKDAY_TEMPLATE);
+    expect(nextPulseDay.current).toBeNull();
+    expect(nextPulseDay.next?.title).toBe("Wake up");
   });
 });
 
