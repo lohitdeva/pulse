@@ -2,15 +2,14 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T2.3c: configure the matching bearer secret, run the first college sync and install triggers.
+**Next action:** T2.3c: inspect the rejected live grid, reproduce HTTP 400 locally and fix the verified incompatibility.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. Generate a random secret using your password manager. In Pulse → Supabase → Edge Functions → Secrets, save it under `COLLEGE_INGEST_TIMETABLE_BEARER_SECRET`.
-2. Save the identical name and value in the college Apps Script project’s Script Properties.
-3. Run `syncCollegeTimetable` once and authorize access. After success, run `installCollegeTimetableTriggers` once. Report success or the HTTP status only.
+1. In the college Apps Script editor, temporarily add this line immediately before `var requestOptions` in `syncCollegeTimetable`: `DriveApp.createFile('pulse-timetable-debug.json', JSON.stringify({values: values, merges: merges}), MimeType.PLAIN_TEXT); return;`
+2. Run once, download that private JSON from My Drive to Downloads, then remove the temporary line and save. Tell the planner the file is ready. Keep triggers off until the first successful sync.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
@@ -18,7 +17,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 
 - Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
 - T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 implementation passed offline checks; college properties configured; first sync pending.
-- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). T2.3c awaits matching secret, live sync and second fixture.
+- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; exact failing condition unknown until the live grid is available.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -152,3 +151,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 17:25 · Codex · Completed T1.5b–c, T1.6a–c and T1.7. Hosted migrations verified, all 147 tests passed, Chrome CRUD smoke passed. Stopped at the Phase 1 boundary.
 - 2026-11-26 23:06 · Codex · T2.1 done · T2.2 implementation passed offline checks; waiting for college-account setup.
 - 2026-11-26 23:28 · Codex · T2.3a–b done and deployed · waiting for first college sync (T2.3c).
+- 2026-11-27 00:12 · Codex · T2.3c diagnosis · waiting for the rejected grid from the private college sheet.
