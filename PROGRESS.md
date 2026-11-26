@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Diagnose hosted worker activation and verify in a real browser engine.
+**Next action:** T0.4d — dedupe `sw.ts` precache `addAll`; verify worker activation on a local prod build. Then user deploys + runs the S23 push test.
 **Current phase:** 0
 
 ## Needs you
@@ -16,13 +16,13 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
-- **Last tool:** Codex. It stopped on a usage limit right after the `chore: start T0.4d` checkpoint. The tree was clean.
-- **Current ticket:** T0.4d. The production service worker never activates on the hosted site, so `navigator.serviceWorker.ready` never resolves and the S23 can't enroll for push.
-- **Already tried (T0.4c):** bounded enrollment waits and preserved the permission gesture. Deployed, but the S23 retry is still pending.
-- **Lead (unverified, from a review on 26 Nov):** the install handler in `app/src/sw.ts` runs `cache.addAll()` over the whole precache manifest. One failed URL fails the install, so the worker never activates. Confirm in a real browser (DevTools → Application → Service Workers, console) before changing code.
-- **Option for the user:** park T0.4d and start Phase 1. Push isn't needed until Phase 3. Ask under Needs you if T0.4d needs another follow-up ticket.
-- **Small fix noted:** the manifest `theme_color` and `background_color` are light (#f7f7f5), but the app is dark (#0b0e14).
-- **After T0.4d:** T0.5. The user's S23 test steps are under Needs you.
+- **Last tool:** Claude Code (planner).
+- **Current ticket:** T0.4d IN PROGRESS — fixing worker activation.
+- **Root cause (CONFIRMED in a real browser engine, 26 Nov):** `app/src/sw.ts` install handler calls `cache.addAll()` on a **non-deduplicated** list. VitePWA injects the manifest icons + webmanifest *and* the glob re-captures them, so `pulse-192.png`, `pulse-512.png`, `manifest.webmanifest` each appear twice → `addAll` rejects `InvalidStateError: duplicate requests` → install fails → worker redundant → never activates → `serviceWorker.ready` never resolves → S23 enrollment times out at 10s.
+- **Prior lead was wrong:** all 10 precache URLs return 200; no failed URL. Deduping (`addAll([...precacheUrls])`, the Set already built at sw.ts:40) **succeeds** in-browser.
+- **Fix:** dedupe `cache.addAll` to use `precacheUrls`; also set manifest `theme_color`/`background_color` to the dark app bg (#0b0e14; was light #f7f7f5).
+- **To try next:** build + browser-pane verify the SW activates locally; then user deploys and retries the S23.
+- **After T0.4d:** continue to Phase 1 T1.1 (`shared/time.ts`). T0.5 device acceptance still WAITING ON USER.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -132,3 +132,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 — T0.4a/b passed, backend and PWA deployed. T0.5 software checks passed. Production routes, bundled public keys, worker, manifest and icons verified via HTTP. S23 install, sign-in, delivery and action receipts pending.
 - 2026-11-26 — T0.4c fixed unbounded enrollment waits and preserved the permission gesture. Verified updated production bundle and worker. S23 retry pending; no subscription existed at diagnosis.
 - 2026-11-26 11:05 · Claude (chat) · no tickets · Added CLAUDE.md, `.claude/agents/` and shared handoff rules so Codex and Claude Code can alternate. Next session continues T0.4d or parks it.
+- 2026-11-26 · Claude Code · T0.4d root-caused in a real browser (duplicate precache URLs → `addAll` rejects); fixing dedupe + dark manifest colors, then continuing to T1.1.
