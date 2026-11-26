@@ -16,7 +16,7 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 
 ## Handoff notes
 
-- Codex is verifying Claude Code’s interrupted T1.5b working tree against the ticket and full suite.
+- Codex is verifying T1.5b retry consistency after the checker found water duplicates on lost acknowledgments. T1.6a storage can proceed independently.
 - T1.1–T1.5a have completion commits. T1.5c follows the logging cards, then T1.6 and the full phase gate.
 - Production auto-deploys from main. Hosted logging and any task migrations must be applied before push.
 - Leave the local untracked Claude launch configuration outside commits.
@@ -47,7 +47,8 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 | T1.5a | Logging tables (`item_logs`, `meal_logs`, `water_logs`, RLS) + Dexie offline queue + sync engine wired to the Today sync dot; unit tests | §13 Interaction (offline-first) | DONE (hosted apply pending — before T1.5b) |
 | T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | IN PROGRESS |
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | TODO |
-| T1.6 | Manual tasks: basic CRUD with the §5 fields | §5 Task fields | TODO |
+| T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | IN PROGRESS |
+| T1.6b | Manual task list, quick add, edit and delete in the signed-in app | §5 Task fields | TODO |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
 | ID | Ticket | PRD | Status |
