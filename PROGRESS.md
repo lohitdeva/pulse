@@ -58,14 +58,14 @@ _(Nothing right now.)_
 | T2.3a | Atomic snapshot, class reconciliation and change-alert queue migration | §4, §14 | DONE |
 | T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | DONE |
 | T2.3c | Verify college sync, triggers and second fixture | §4, §14 | DONE |
-| T2.4a | Classes on Today: fetch day's `classes` as `busy` into `buildDayPlan`, class items on Now/Next + timeline, unseen change alerts listed | §4 Class handling, Change alerts | TODO |
+| T2.4a | Classes on Today: fetch day's `classes` as `busy` into `buildDayPlan`, class items on Now/Next + timeline, unseen change alerts listed | §4 Class handling, Change alerts | IN PROGRESS |
 | T2.4b | Class overrides migration + data layer: attendance (Attended/Missed/Medical/Cancelled), manual cancel/restore/move/extra; reconcile honours manual changes, auto-restore, sheet-wins-on-cell-change | §4 Cancelled classes, Manual changes | TODO |
 | T2.4c | Class UI: attendance prompt after class end, struck-through cancelled class with Restore, move / add-extra sheets | §4 | TODO |
 
 ## Phase 3: Reminder engine and check-ins (PRD §6)
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
-| T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | TODO |
+| T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | IN PROGRESS |
 | T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | TODO |
 | T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | TODO |
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | TODO |
