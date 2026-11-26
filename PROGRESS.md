@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T3.2a reminders tables + pg_cron dispatcher job.
+**Next action:** T3.2b dispatch-reminders function; then (user OK) push `20261127010000_reminders.sql` + deploy function with --no-verify-jwt.
 **Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
@@ -20,6 +20,7 @@ _(Nothing right now.)_
 - T2.4a + T3.1 DONE (checker PASS; 211 tests). Carry-overs: `fetchDayClasses` filters by source_date only — moved-in classes from another day missing (fix in T2.4b/c). `evaluate()` re-reports `missed` every call after window close — dispatcher (T3.2b) must persist a 'missed' resolution. pnpm not on PATH: use `npx -y pnpm@11.25.0`.
 - T2.4b DONE (checker PASS by SQL review). Migration `20261127000000_class_overrides.sql` applied to hosted 2026-11-27 with user OK (verified: origin col, add_extra_class, RLS, 160 sheet rows); pgTAP `supabase/tests/timetable_reconciliation.test.sql` (plan 52) never executed — no Postgres here. Attendance = item_logs `class:<id>` + meta.attendance. Extra classes via `add_extra_class` RPC (origin='manual'). Nit: RPC lacks explicit end>start/blank-title errors (constraints still enforce).
 - PHASE 2 DONE (tag phase-2): gate PASS, 246 tests (shared 101, functions 54, app 91).
+- T3.2a DONE (checker PASS by SQL review; pgTAP plan 30 not run). Migration NOT on hosted yet. Cron `dispatch-reminders` every minute posts Bearer <vault dispatch_cron_secret> to /functions/v1/dispatch-reminders; function must verify via `check_dispatch_secret` (service_role) and deploy with verify_jwt=false. Hosted has pg_cron/pg_net available (not installed), vault+pgcrypto installed.
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -69,8 +70,8 @@ _(Nothing right now.)_
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | DONE |
-| T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | IN PROGRESS |
-| T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | TODO |
+| T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | DONE |
+| T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | IN PROGRESS |
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | TODO |
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | TODO |
 | T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | TODO |
