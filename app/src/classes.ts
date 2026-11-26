@@ -4,7 +4,7 @@ import {
   type PlanClass,
   type PlanInterval,
 } from "@pulse/shared";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /** Subset of `public.classes` that Today reads. */
 export type ClassRow = {
@@ -126,7 +126,9 @@ export async function fetchDayAlerts(
 export function useDayClasses(
   client: SupabaseClient | null,
   dayKey: string,
-): { classes: PlanClass[]; alerts: ChangeAlert[] } {
+): { classes: PlanClass[]; alerts: ChangeAlert[]; reload: () => void } {
+  const [tick, setTick] = useState(0);
+  const reload = useCallback(() => setTick((t) => t + 1), []);
   const [state, setState] = useState<{
     dayKey: string;
     classes: PlanClass[];
@@ -158,9 +160,9 @@ export function useDayClasses(
       cancelled = true;
       window.removeEventListener("online", load);
     };
-  }, [client, dayKey]);
+  }, [client, dayKey, tick]);
 
   return state.dayKey === dayKey
-    ? { classes: state.classes, alerts: state.alerts }
-    : { classes: [], alerts: [] };
+    ? { classes: state.classes, alerts: state.alerts, reload }
+    : { classes: [], alerts: [], reload };
 }

@@ -7,6 +7,7 @@ import {
   type ScheduleItem,
 } from "@pulse/shared";
 import type { ChangeAlert } from "./classes";
+import { AddExtraClass, ClassRowActions, type ClassActionsApi } from "./ClassActions";
 import { Card, IconChip, RingGauge } from "./ui";
 
 export interface TodayProps {
@@ -23,6 +24,8 @@ export interface TodayProps {
   habitStatuses?: Record<string, ItemLogStatus>;
   onHabitStatusChange?: (itemKey: string, status: "done" | "skipped") => void;
   logging?: ReactNode;
+  /** Class attendance / cancel / move / extra-class controls; omitted = read-only classes. */
+  classActions?: ClassActionsApi;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -135,6 +138,7 @@ export function Today({
   habitStatuses = {},
   onHabitStatusChange,
   logging,
+  classActions,
 }: TodayProps) {
   const { current, next, fraction } = nowNext(plan, now);
   const nowMs = now.getTime();
@@ -240,6 +244,7 @@ export function Today({
         <h2 id="timeline-title" className="timeline-title">
           Timeline
         </h2>
+        {classActions ? <AddExtraClass api={classActions} dayKey={plan.dayKey} /> : null}
         <ol className="timeline">
           {plan.items.map((item) => {
             const end = item.endAt?.getTime() ?? item.startAt?.getTime() ?? Number.POSITIVE_INFINITY;
@@ -266,13 +271,16 @@ export function Today({
                   {item.source === "class" ? (
                     <span className="timeline-sub">
                       {classDetail(item)}
-                      {isCancelled(item) ? " · Cancelled" : ""}
+                      {isCancelled(item) && !classActions ? " · Cancelled" : ""}
                     </span>
                   ) : null}
                   {isNews(item) && minutes !== null ? (
                     <span className="timeline-sub">{minutes} min</span>
                   ) : item.startAt && item.endAt ? (
                     <span className="timeline-sub">{timeRange(item)}</span>
+                  ) : null}
+                  {item.source === "class" && classActions ? (
+                    <ClassRowActions item={item} now={now} api={classActions} dayKey={plan.dayKey} />
                   ) : null}
                   {itemKey && onHabitStatusChange ? (
                     <div className="habit-logging">

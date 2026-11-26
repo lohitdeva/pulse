@@ -19,18 +19,21 @@ import {
   subscribe,
 } from "./offline/queue";
 
+/** Item log row plus the optional `meta` (class attendance lives in `meta.attendance`). */
+export type ItemLogRowWithMeta = ItemLogRow & { meta?: Record<string, unknown> | null };
+
 export interface DayLogs {
   mealLogs: MealLogRow[];
   waterLogs: WaterLogRow[];
-  itemLogs: ItemLogRow[];
+  itemLogs: ItemLogRowWithMeta[];
 }
 
 const EMPTY_ROWS: DayLogRows = { meals: [], water: [], items: [] };
 
-async function pendingItemLogs(
+export async function pendingItemLogs(
   userId: string,
   dayKey: string,
-): Promise<ItemLogRow[]> {
+): Promise<ItemLogRowWithMeta[]> {
   const rows = await offlineDb.pending.orderBy("id").toArray();
   return rows.flatMap((row) => {
     const payload = row.payload;
@@ -45,8 +48,16 @@ async function pendingItemLogs(
     ) {
       return [];
     }
+    const meta =
+      payload.meta && typeof payload.meta === "object"
+        ? (payload.meta as Record<string, unknown>)
+        : undefined;
     return [
-      { item_key: payload.item_key, status: payload.status as ItemLogStatus },
+      {
+        item_key: payload.item_key,
+        status: payload.status as ItemLogStatus,
+        ...(meta ? { meta } : {}),
+      },
     ];
   });
 }
@@ -111,7 +122,7 @@ export function useDayLogs(
               .eq("day_key", dayKey),
             client
               .from("item_logs")
-              .select("item_key, status")
+              .select("item_key, status, meta")
               .eq("user_id", userId)
               .eq("day_key", dayKey),
           ]);
@@ -147,7 +158,7 @@ export function useDayLogs(
     return {
       mealLogs: merged.meals,
       waterLogs: merged.water,
-      itemLogs: merged.items ?? [],
+      itemLogs: (merged.items ?? []) as ItemLogRowWithMeta[],
     };
   }, [server, pending]);
 

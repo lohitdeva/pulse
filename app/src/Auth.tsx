@@ -22,6 +22,7 @@ import { seedDefaults } from "./seed";
 import { TaskPlan } from "./TaskPlan";
 import { dateLabelFor, greetingFor, Today } from "./Today";
 import { busyFromClasses, useDayClasses } from "./classes";
+import { attendanceByClass, useClassActions } from "./ClassActions";
 import { useDayLogs } from "./useDayLogs";
 import { BottomTabs, Sheet, type TabName } from "./ui";
 
@@ -104,7 +105,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   }, []);
 
   const dayKey = currentPulseDayKey(now);
-  const { classes, alerts } = useDayClasses(client, dayKey);
+  const { classes, alerts, reload: reloadClasses } = useDayClasses(client, dayKey);
   const plan = useMemo(
     () =>
       buildDayPlan(
@@ -125,6 +126,17 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
     [logs.itemLogs],
   );
 
+  const attendance = useMemo(
+    () => attendanceByClass(logs.itemLogs),
+    [logs.itemLogs],
+  );
+  const classActions = useClassActions({
+    client,
+    userId,
+    attendance,
+    reload: reloadClasses,
+  });
+
   return (
     <div className="today-shell">
       {activeTab === "Today" ? (
@@ -139,6 +151,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
             onOpenSettings={() => setSettingsOpen(true)}
             habitStatuses={habitStatuses}
             onHabitStatusChange={setItemStatus}
+            classActions={classActions}
             logging={
               <>
                 <WaterCard totals={waterTotals(logs.waterLogs)} onAdd={addWater} />

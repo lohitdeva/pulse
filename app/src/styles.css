@@ -145,3 +145,95 @@ a:focus-visible {
   text-decoration: line-through;
   opacity: 0.6;
 }
+
+.class-controls {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.class-attendance,
+.class-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.class-attendance-label {
+  flex-basis: 100%;
+  color: var(--pulse-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.class-action {
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.class-action[aria-pressed="true"] {
+  border-color: var(--pulse-blue);
+}
+
+.class-chip {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border: 1px solid var(--pulse-border);
+  border-radius: 999px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--pulse-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.class-chip-cancelled {
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  color: var(--pulse-orange);
+}
+
+.class-error {
+  margin: 0;
+  color: var(--pulse-red);
+  font-size: 0.8rem;
+}
+
+.class-form {
+  display: grid;
+  gap: 12px;
+}
+
+.class-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.class-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--pulse-control-size);
+  border: 1px solid var(--pulse-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: var(--pulse-bg);
+  color: var(--pulse-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.class-field input:focus-visible {
+  outline: 3px solid var(--pulse-mint);
+  outline-offset: 2px;
+}
+
+.add-class-button {
+  margin-bottom: 12px;
+}
