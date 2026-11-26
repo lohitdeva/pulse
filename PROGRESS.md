@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS) + seed weekday/weekend templates from the §4 table and facility hours (mess, gym) into settings. (T0.4d fix now deployed + verified live; the S23 functional push test is the remaining user step under Needs you.)
+**Next action:** T0.4e — polyfill `Uint8Array.fromBase64`/`toBase64` for `send-test-push` so Web Push encryption works on the Supabase Edge Runtime (Deno 2.1.4). Then user redeploys the function + retests on the S23. (T1.2 queued after.)
 **Current phase:** 0
 
 ## Needs you
@@ -22,7 +22,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 - **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
 - **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse set; `main` pushed by user. **T0.4d fix is now DEPLOYED and VERIFIED LIVE** — in-browser on pulse-tau-liard: sw.js 4794 B, install uses `addAll([...])`, the SW registers and ACTIVATES, `serviceWorker.ready` resolves (previously went redundant). Remaining: the S23 functional push test (enroll + test notification + Done/Snooze) — user step. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
 - **Sign-in blocker (26 Nov) — RESOLVED:** was Supabase's built-in email rate limit; fixed with free custom SMTP via **Resend** (`onboarding@resend.dev` sender, delivers to the user's own inbox; Brevo failed Yahoo/Gmail DKIM/DMARC with a free-mail sender). Sign-in + push enrollment now work.
-- **Test-push blocker (26 Nov):** `send-test-push` returned 502 — Supabase's VAPID secrets were a DIFFERENT keypair from the app. Enrollment used the app key (`VITE_VAPID_PUBLIC_KEY` = `.env.local` `VAPID_PUBLIC_KEY` = `BGEv9JJPyE9e…KobVoHeI`), but Supabase signed with another, so the push service rejected it. Fix (user, dashboard): set Supabase Edge Function secrets `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` to the `.env.local` values. No app redeploy or phone re-enroll needed. Function is deployed + JWT-gated (verified).
+- **Test-push blocker (26 Nov) — REAL root cause found (T0.4e):** `send-test-push` 502 is `TypeError: Uint8Array.fromBase64 is not a function` (from function logs). The `jsr:@daaku/webpush@0.2.0` lib calls `Uint8Array.fromBase64`, which the Supabase Edge Runtime (supabase-edge-runtime-1.79.1, Deno 2.1.4) does not implement, so encryption throws before any network call (~16 ms). NOT a VAPID/secret problem — the VAPID keys were aligned anyway (`.env.local` keypair is valid; public = `BGEv9JJPyE9e…KobVoHeI` = app). Fix: polyfill `Uint8Array.fromBase64`/`toBase64` imported before the webpush lib in `send-test-push`. Function is deployed + JWT-gated; auth + enrollment work.
 - **Next ticket:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` with RLS; seed weekday + weekend templates from the §4 table and facility hours (mess, gym) into settings. Read PRD §4. Use `shared/time.ts` for time math. (Supabase/migrations — mind whether DB access needs the user.)
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -37,6 +37,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | DONE |
 | T0.4c | Repair stalled S23 push enrollment | §6, §14 Push | DONE |
 | T0.4d | Restore production worker activation | §14 Push | DONE |
+| T0.4e | Web Push 502 on Supabase Edge Runtime: polyfill `Uint8Array.fromBase64`/`toBase64` (Deno 2.1.4 lacks them; `@daaku/webpush` needs them) | §14 Push | IN PROGRESS |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | WAITING ON USER |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
