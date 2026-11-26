@@ -11,6 +11,7 @@ export interface TodayProps {
   onOpenSettings: () => void;
   onItemDone?: (item: ScheduleItem) => void;
   onStartTimer?: (item: ScheduleItem) => void;
+  logging?: ReactNode;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -77,6 +78,7 @@ export function Today({
   onOpenSettings,
   onItemDone,
   onStartTimer,
+  logging,
 }: TodayProps) {
   const { current, next, fraction } = nowNext(plan, now);
   const nowMs = now.getTime();
@@ -160,6 +162,8 @@ export function Today({
           <p className="score-note">Scores start once you log a few days</p>
         </div>
       </Card>
+
+      {logging}
 
       <section aria-labelledby="timeline-title">
         <h2 id="timeline-title" className="timeline-title">

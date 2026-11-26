@@ -3,7 +3,9 @@ import {
   buildDayPlan,
   currentPulseDayKey,
   istParts,
+  mealsSummary,
   templateForDayKey,
+  waterTotals,
 } from "@pulse/shared";
 import {
   useEffect,
@@ -12,10 +14,12 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { MealsCard, WaterCard } from "./LoggingCards";
 import { flushQueue, usePendingCount } from "./offline/queue";
 import { PushSettings } from "./PushSettings";
 import { seedDefaults } from "./seed";
 import { dateLabelFor, greetingFor, Today } from "./Today";
+import { useDayLogs } from "./useDayLogs";
 import { BottomTabs, Sheet, type TabName } from "./ui";
 
 // TODO: move to settings
@@ -101,6 +105,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
     () => buildDayPlan(templateForDayKey(dayKey), dayKey),
     [dayKey],
   );
+  const { logs, addWater, setMeal } = useDayLogs(client, userId, dayKey);
 
   return (
     <main className="today-shell">
@@ -112,6 +117,12 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
           dateLabel={dateLabelFor(now)}
           syncPending={pending > 0}
           onOpenSettings={() => setSettingsOpen(true)}
+          logging={
+            <>
+              <WaterCard totals={waterTotals(logs.waterLogs)} onAdd={addWater} />
+              <MealsCard summary={mealsSummary(logs.mealLogs)} onSet={setMeal} />
+            </>
+          }
         />
       ) : (
         <section className="coming-soon" aria-labelledby="coming-soon-title">

@@ -1,5 +1,13 @@
-import { buildDayPlan, WEEKDAY_TEMPLATE } from "@pulse/shared";
+import {
+  buildDayPlan,
+  mealsSummary,
+  waterTotals,
+  WEEKDAY_TEMPLATE,
+  type MealLogRow,
+  type WaterLogRow,
+} from "@pulse/shared";
 import { useState, type ReactNode } from "react";
+import { MealsCard, WaterCard } from "./LoggingCards";
 import { Today } from "./Today";
 import {
   BottomTabs,
@@ -37,6 +45,15 @@ function Glyph({ name }: { name: GlyphName }) {
 const SAMPLE_DAY = "2026-11-26";
 const SAMPLE_PLAN = buildDayPlan(WEEKDAY_TEMPLATE, SAMPLE_DAY);
 const SAMPLE_NOW = new Date("2026-11-26T14:15:00.000Z");
+const SAMPLE_WATER: WaterLogRow[] = [
+  { amount_ml: 1000, is_gym: false },
+  { amount_ml: 500, is_gym: false },
+  { amount_ml: 1000, is_gym: true },
+];
+const SAMPLE_MEALS: MealLogRow[] = [
+  { meal: "breakfast", place: "mess" },
+  { meal: "lunch", place: "outside" },
+];
 
 export function DevGallery() {
   const [activeTab, setActiveTab] = useState<TabName>("Today");
@@ -61,6 +78,12 @@ export function DevGallery() {
             greeting="Good evening, Sam"
             dateLabel="Thu, 26 Nov"
             onOpenSettings={() => undefined}
+            logging={
+              <>
+                <WaterCard totals={waterTotals(SAMPLE_WATER)} onAdd={() => undefined} />
+                <MealsCard summary={mealsSummary(SAMPLE_MEALS)} onSet={() => undefined} />
+              </>
+            }
           />
         </div>
       </section>

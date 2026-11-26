@@ -2,23 +2,21 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Finish T1.5b verification and T1.5c, then integrate T1.6b on Plan.
+**Next action:** Start T1.5c habit logging and then integrate the T1.6b task screen.
 **Current phase:** 1
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-_No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applied + app redeployed, seed live) are both complete.
-
-**▶️ Apply the T1.5a logging migration to hosted BEFORE T1.5b's UI deploys** (needs your DB password). The new `supabase/migrations/20261126030000_logging.sql` (item_logs/meal_logs/water_logs) is committed but not on hosted; T1.5b's logging UI will write to those tables, so they must exist first. From the repo root: `npx -y pnpm@11.25.0 exec supabase db push --remote`, then confirm the three tables in Studio. (The project is already linked from T1.2.) Not urgent until T1.5b is ready to deploy — the planner will prompt at that point.
+No user step pending. Both logging and tasks migrations were verified in the hosted migration ledger.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
 ## Handoff notes
 
-- Manual task storage passed independent review. Hosted logging and task migrations are pending.
-- Finish T1.5b verification and T1.5c, then integrate T1.6b on Plan.
-- Main auto-deploys to production. Apply pending hosted migrations before push.
+- T1.5b checker passed after the lost-ack water retry fix. T1.6a passed; both production migrations verified.
+- Start T1.5c habit logging and then integrate the T1.6b task screen.
+- Main auto-deploys to production. Hosted migrations are current.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -43,8 +41,8 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 | T1.2 | Tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS); seed weekday and weekend templates exactly from the §4 table, plus facility hours (mess, gym) in settings | §4 | DONE |
 | T1.3 | `shared/dayplan.ts`: template → schedule items for a date, including the news-reading placement rule; tests | §4 | DONE |
 | T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | DONE |
-| T1.5a | Logging tables (`item_logs`, `meal_logs`, `water_logs`, RLS) + Dexie offline queue + sync engine wired to the Today sync dot; unit tests | §13 Interaction (offline-first) | DONE (hosted apply pending — before T1.5b) |
-| T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | IN PROGRESS |
+| T1.5a | Logging tables (`item_logs`, `meal_logs`, `water_logs`, RLS) + Dexie offline queue + sync engine wired to the Today sync dot; unit tests | §13 Interaction (offline-first) | DONE |
+| T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | DONE |
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | TODO |
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete in the signed-in app | §5 Task fields | TODO |

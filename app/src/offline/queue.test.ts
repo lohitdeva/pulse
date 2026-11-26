@@ -21,7 +21,12 @@ function mockClient(results: Result[] = []) {
   insert.mockImplementation(next);
   upsert.mockImplementation(next);
   const from = vi.fn(() => ({ insert, upsert }));
-  return { client: { from } as unknown as SupabaseClient, from, insert, upsert };
+  return {
+    client: { from } as unknown as SupabaseClient,
+    from,
+    insert,
+    upsert,
+  };
 }
 
 beforeEach(async () => {
@@ -83,9 +88,11 @@ describe("offline queue", () => {
   it("logWater marks gym water and inserts", async () => {
     await logWater("u1", "2026-11-26", 500, true);
     const [row] = await offlineDb.pending.toArray();
-    expect(row?.op).toBe("insert");
+    expect(row?.op).toBe("upsert");
     expect(row?.table).toBe("water_logs");
+    expect(row?.onConflict).toBe("id");
     expect(row?.payload).toMatchObject({
+      id: expect.any(String),
       user_id: "u1",
       day_key: "2026-11-26",
       amount_ml: 500,
@@ -104,9 +111,86 @@ describe("offline queue", () => {
   });
 
   it("log helpers flush right away when a client is given and online", async () => {
-    const { client, insert } = mockClient();
+    const { client, upsert } = mockClient();
     await logWater("u1", "2026-11-26", 1000, false, client);
-    expect(insert).toHaveBeenCalledTimes(1);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(await pendingCount()).toBe(0);
+  });
+
+  it("retries a water write with the same id after the server accepted it but the ack was lost", async () => {
+    const serverRows = new Map<string, Record<string, unknown>>();
+    const attemptedIds: string[] = [];
+    const makeClient = (result: Result) => {
+      const upsert = vi.fn(async (payload: Record<string, unknown>) => {
+        const id = payload.id as string;
+        attemptedIds.push(id);
+        serverRows.set(id, payload);
+        return result;
+      });
+      return {
+        client: {
+          from: vi.fn(() => ({ insert: vi.fn(), upsert })),
+        } as unknown as SupabaseClient,
+        upsert,
+      };
+    };
+
+    const first = makeClient({ error: { message: "ack lost" } });
+    await logWater("u1", "2026-11-26", 1000, false, first.client);
+    const [queued] = await offlineDb.pending.toArray();
+    const stableId = queued?.payload.id;
+
+    expect(stableId).toEqual(expect.any(String));
+    expect(serverRows.size).toBe(1);
+    expect(await pendingCount()).toBe(1);
+
+    const retry = makeClient({ error: null });
+    await flushQueue(retry.client);
+
+    expect(retry.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: stableId }),
+      { onConflict: "id" },
+    );
+    expect(attemptedIds).toEqual([stableId, stableId]);
+    expect(serverRows.size).toBe(1);
+    expect(await pendingCount()).toBe(0);
+  });
+
+  it("migrates an already-enqueued legacy water event to the matching remote UUID before retrying", async () => {
+    const remoteId = "remote-water-id";
+    const loggedAt = "2026-11-26T09:00:00.000Z";
+    await enqueue({
+      table: "water_logs",
+      op: "insert",
+      payload: {
+        user_id: "u1",
+        day_key: "2026-11-26",
+        amount_ml: 500,
+        is_gym: true,
+        logged_at: loggedAt,
+      },
+    });
+
+    const filters = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(async () => ({ data: { id: remoteId }, error: null })),
+    };
+    filters.eq.mockReturnValue(filters);
+    filters.limit.mockReturnValue(filters);
+    const select = vi.fn(() => filters);
+    const upsert = vi.fn(async () => ({ error: null }));
+    const from = vi.fn(() => ({ select, upsert, insert: vi.fn() }));
+    const client = { from } as unknown as SupabaseClient;
+
+    await flushQueue(client);
+
+    expect(select).toHaveBeenCalledWith("id");
+    expect(filters.eq).toHaveBeenCalledWith("logged_at", loggedAt);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: remoteId, amount_ml: 500 }),
+      { onConflict: "id" },
+    );
     expect(await pendingCount()).toBe(0);
   });
 

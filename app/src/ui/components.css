@@ -998,3 +998,108 @@ button.list-row:hover .list-row-value {
 .today-sample {
   margin-bottom: 24px;
 }
+
+.log-card {
+  display: grid;
+  gap: 12px;
+  padding: var(--pulse-card-padding);
+}
+
+.log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pulse-gap);
+}
+
+.log-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.log-count {
+  color: var(--pulse-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-note {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.8rem;
+}
+
+.log-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.water-card > .log-actions .button {
+  flex: 1;
+}
+
+.log-gym {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulse-gap);
+  border-top: 1px solid var(--pulse-border);
+  padding-top: 12px;
+}
+
+.log-gym-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.log-gym-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.log-gym .button {
+  min-width: var(--pulse-control-size);
+  padding: 0 14px;
+}
+
+.meal-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meal-row {
+  display: grid;
+  gap: 6px;
+}
+
+.meal-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.meal-places {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.place-btn {
+  min-height: var(--pulse-control-size);
+  border: 1px solid var(--pulse-border);
+  border-radius: 12px;
+  background: var(--pulse-surface-raised);
+  color: var(--pulse-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.place-btn-active {
+  border-color: var(--pulse-green);
+  background: color-mix(in srgb, var(--pulse-green) 22%, var(--pulse-surface-raised));
+}

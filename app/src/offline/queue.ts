@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import type { MealLogRow, WaterLogRow } from "@pulse/shared";
 import { offlineDb, type PendingMutation } from "./db";
 
 export type NewMutation = Omit<PendingMutation, "id" | "createdAt">;
@@ -34,7 +35,91 @@ export function pendingCount(): Promise<number> {
   return offlineDb.pending.count();
 }
 
+/** Unsynced meal/water writes for one user and day, in enqueue order. */
+export async function pendingDayLogs(
+  userId: string,
+  dayKey: string,
+): Promise<{ meals: MealLogRow[]; water: WaterLogRow[] }> {
+  const rows = await offlineDb.pending.orderBy("id").toArray();
+  const meals: MealLogRow[] = [];
+  const water: WaterLogRow[] = [];
+  for (const row of rows) {
+    const p = row.payload;
+    if (p.user_id !== userId || p.day_key !== dayKey) continue;
+    if (row.table === "meal_logs") {
+      meals.push({
+        meal: p.meal as MealLogRow["meal"],
+        place: p.place as MealLogRow["place"],
+      });
+    } else if (row.table === "water_logs") {
+      water.push({
+        ...(typeof p.id === "string" ? { id: p.id } : {}),
+        amount_ml: Number(p.amount_ml),
+        is_gym: p.is_gym === true,
+        ...(typeof p.logged_at === "string" ? { logged_at: p.logged_at } : {}),
+      });
+    }
+  }
+  return { meals, water };
+}
+
 let flushing: Promise<{ flushed: number; remaining: number }> | null = null;
+
+function isLegacyWaterPayload(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & {
+  user_id: string;
+  day_key: string;
+  amount_ml: number;
+  is_gym: boolean;
+  logged_at: string;
+} {
+  return (
+    typeof payload.id !== "string" &&
+    typeof payload.user_id === "string" &&
+    typeof payload.day_key === "string" &&
+    typeof payload.amount_ml === "number" &&
+    typeof payload.is_gym === "boolean" &&
+    typeof payload.logged_at === "string"
+  );
+}
+
+async function prepareWaterMutation(
+  client: SupabaseClient,
+  row: PendingMutation,
+): Promise<PendingMutation> {
+  if (row.table !== "water_logs") return row;
+
+  let id = typeof row.payload.id === "string" ? row.payload.id : undefined;
+  if (!id && isLegacyWaterPayload(row.payload)) {
+    const { data, error } = await client
+      .from("water_logs")
+      .select("id")
+      .eq("user_id", row.payload.user_id)
+      .eq("day_key", row.payload.day_key)
+      .eq("amount_ml", row.payload.amount_ml)
+      .eq("is_gym", row.payload.is_gym)
+      .eq("logged_at", row.payload.logged_at)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    id = typeof data?.id === "string" ? data.id : undefined;
+    if (!id) id = crypto.randomUUID();
+  }
+
+  if (!id) return row;
+  if (row.op === "upsert" && row.onConflict === "id") return row;
+  if (row.id === undefined)
+    throw new Error("Water queue row is missing its local id");
+
+  const payload = { ...row.payload, id };
+  await offlineDb.pending.update(row.id, {
+    op: "upsert",
+    onConflict: "id",
+    payload,
+  });
+  return { ...row, op: "upsert", onConflict: "id", payload };
+}
 
 async function runFlush(
   client: SupabaseClient,
@@ -48,14 +133,17 @@ async function runFlush(
     if (rows.length === 0) break;
     for (const row of rows) {
       try {
-        const query = client.from(row.table);
+        const mutation = await prepareWaterMutation(client, row);
+        const query = client.from(mutation.table);
         const { error } =
-          row.op === "upsert"
+          mutation.op === "upsert"
             ? await query.upsert(
-                row.payload,
-                row.onConflict ? { onConflict: row.onConflict } : undefined,
+                mutation.payload,
+                mutation.onConflict
+                  ? { onConflict: mutation.onConflict }
+                  : undefined,
               )
-            : await query.insert(row.payload);
+            : await query.insert(mutation.payload);
         if (error) {
           stopped = true;
           break;
@@ -144,8 +232,10 @@ export function logWater(
 ): Promise<number> {
   return enqueueAndFlush(client, {
     table: "water_logs",
-    op: "insert",
+    op: "upsert",
+    onConflict: "id",
     payload: {
+      id: crypto.randomUUID(),
       user_id: userId,
       day_key: dayKey,
       amount_ml: amountMl,
