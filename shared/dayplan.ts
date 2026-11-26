@@ -4,7 +4,13 @@
  * news-reading minutes into the earliest free slots. Pure, no I/O.
  */
 import { blockInstants } from "./time";
-import type { BlockType, DayTemplate, TemplateBlock } from "./schedule";
+import {
+  WEEKDAY_TEMPLATE,
+  WEEKEND_TEMPLATE,
+  type BlockType,
+  type DayTemplate,
+  type TemplateBlock,
+} from "./schedule";
 
 export interface PlanInterval {
   start: Date;
@@ -191,4 +197,49 @@ export function buildDayPlan(
   });
 
   return { dayKey, items, newsLeftoverMinutes: leftover };
+}
+
+export interface NowNext {
+  current: ScheduleItem | null;
+  next: ScheduleItem | null;
+  /** Progress through `current` in [0, 1]; 0 when there is no current item. */
+  fraction: number;
+}
+
+/**
+ * The item in progress at `now` (start inclusive, end exclusive; the latest
+ * start wins when several overlap), the earliest item starting after `now`,
+ * and how far through the current item we are.
+ */
+export function nowNext(plan: DayPlan, now: Date): NowNext {
+  const t = now.getTime();
+  let current: ScheduleItem | null = null;
+  let next: ScheduleItem | null = null;
+  for (const item of plan.items) {
+    if (!item.startAt) continue;
+    const s = item.startAt.getTime();
+    if (item.endAt && s <= t && t < item.endAt.getTime()) {
+      if (!current || s > (current.startAt as Date).getTime()) current = item;
+    }
+    if (s > t && (!next || s < (next.startAt as Date).getTime())) next = item;
+  }
+  let fraction = 0;
+  if (current?.startAt && current.endAt) {
+    const span = current.endAt.getTime() - current.startAt.getTime();
+    fraction =
+      span > 0
+        ? Math.min(1, Math.max(0, (t - current.startAt.getTime()) / span))
+        : 0;
+  }
+  return { current, next, fraction };
+}
+
+/** Weekend template for Saturday/Sunday of the (IST calendar) date, else weekday. */
+export function templateForDayKey(dayKey: string): DayTemplate {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+  if (!m) throw new Error(`Invalid day key: ${dayKey}`);
+  const dow = new Date(
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])),
+  ).getUTCDay();
+  return dow === 0 || dow === 6 ? WEEKEND_TEMPLATE : WEEKDAY_TEMPLATE;
 }

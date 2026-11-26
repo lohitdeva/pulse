@@ -1,4 +1,6 @@
+import { buildDayPlan, WEEKDAY_TEMPLATE } from "@pulse/shared";
 import { useState, type ReactNode } from "react";
+import { Today } from "./Today";
 import {
   BottomTabs,
   Card,
@@ -30,6 +32,12 @@ function Glyph({ name }: { name: GlyphName }) {
   );
 }
 
+// Sample data so /dev renders the real Today layout without signing in.
+// 19:45 IST on 2026-11-26 is 14:15 UTC, inside the Gym block.
+const SAMPLE_DAY = "2026-11-26";
+const SAMPLE_PLAN = buildDayPlan(WEEKDAY_TEMPLATE, SAMPLE_DAY);
+const SAMPLE_NOW = new Date("2026-11-26T14:15:00.000Z");
+
 export function DevGallery() {
   const [activeTab, setActiveTab] = useState<TabName>("Today");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -43,6 +51,19 @@ export function DevGallery() {
           <h1>UI gallery</h1>
         </div>
       </header>
+
+      <section className="gallery-section" aria-labelledby="section-today">
+        <SectionHeading id="section-today" title="Today screen" detail="Sample data, 19:45 IST" />
+        <div className="today-sample">
+          <Today
+            plan={SAMPLE_PLAN}
+            now={SAMPLE_NOW}
+            greeting="Good evening, Sam"
+            dateLabel="Thu, 26 Nov"
+            onOpenSettings={() => undefined}
+          />
+        </div>
+      </section>
 
       <div className="gallery-grid">
         <section className="gallery-section" aria-labelledby="section-card-gauge">

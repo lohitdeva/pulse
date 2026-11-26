@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildDayPlan, type ScheduleItem } from "./dayplan";
+import {
+  buildDayPlan,
+  nowNext,
+  templateForDayKey,
+  type ScheduleItem,
+} from "./dayplan";
 import { WEEKDAY_TEMPLATE, WEEKEND_TEMPLATE } from "./schedule";
 import { blockInstants } from "./time";
 
@@ -118,5 +123,68 @@ describe("buildDayPlan weekend and determinism", () => {
     expect(buildDayPlan(WEEKDAY_TEMPLATE, DAY, busy)).toEqual(
       buildDayPlan(WEEKDAY_TEMPLATE, DAY, busy),
     );
+  });
+});
+
+describe("nowNext", () => {
+  const plan = buildDayPlan(WEEKDAY_TEMPLATE, DAY);
+  const at = (hhmm: string) => blockInstants(DAY, hhmm, hhmm).start;
+
+  it("returns the current block, fraction and next block", () => {
+    const r = nowNext(plan, at("19:45"));
+    expect(r.current?.title.startsWith("Gym")).toBe(true);
+    expect(r.fraction).toBeGreaterThan(0);
+    expect(r.fraction).toBeLessThan(1);
+    expect(r.fraction).toBeCloseTo(15 / 75, 5);
+    expect(r.next?.title).toBe("Freshen up after the gym");
+  });
+
+  it("before the first block: no current, next is Wake up", () => {
+    const r = nowNext(plan, at("05:00"));
+    expect(r.current).toBeNull();
+    expect(r.fraction).toBe(0);
+    expect(r.next?.title).toBe("Wake up");
+    expect(r.next?.startAt).toEqual(at("07:00"));
+  });
+
+  it("in a gap between blocks: no current, next is upcoming", () => {
+    const r = nowNext(plan, at("17:20"));
+    expect(r.current).toBeNull();
+    expect(r.next?.title).toBe("Snacks");
+  });
+
+  it("after Lights out there is no next", () => {
+    const r = nowNext(plan, new Date(at("01:00").getTime() + 60_000));
+    expect(r.next).toBeNull();
+    expect(r.current).toBeNull();
+  });
+
+  it("picks the latest-starting item when blocks overlap", () => {
+    const r = nowNext(plan, at("08:42"));
+    expect(r.current?.title).toBe("Shower and get ready");
+    const overlap = nowNext(plan, at("09:00"));
+    expect(overlap.current?.title.startsWith("Breakfast")).toBe(true);
+  });
+
+  it("start is inclusive and end is exclusive", () => {
+    expect(nowNext(plan, at("19:30")).current?.title.startsWith("Gym")).toBe(
+      true,
+    );
+    expect(nowNext(plan, at("20:45")).current?.title).toBe(
+      "Freshen up after the gym",
+    );
+  });
+});
+
+describe("templateForDayKey", () => {
+  it("uses the weekday template Monday to Friday", () => {
+    expect(templateForDayKey("2026-11-26")).toBe(WEEKDAY_TEMPLATE); // Thursday
+    expect(templateForDayKey("2026-11-23")).toBe(WEEKDAY_TEMPLATE); // Monday
+    expect(templateForDayKey("2026-11-27")).toBe(WEEKDAY_TEMPLATE); // Friday
+  });
+
+  it("uses the weekend template on Saturday and Sunday", () => {
+    expect(templateForDayKey("2026-11-28")).toBe(WEEKEND_TEMPLATE); // Saturday
+    expect(templateForDayKey("2026-11-29")).toBe(WEEKEND_TEMPLATE); // Sunday
   });
 });

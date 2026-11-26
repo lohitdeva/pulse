@@ -1,7 +1,24 @@
-import { createClient, type Session } from "@supabase/supabase-js";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  buildDayPlan,
+  currentPulseDayKey,
+  istParts,
+  templateForDayKey,
+} from "@pulse/shared";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { PushSettings } from "./PushSettings";
 import { seedDefaults } from "./seed";
+import { dateLabelFor, greetingFor, Today } from "./Today";
+import { BottomTabs, Sheet, type TabName } from "./ui";
+
+// TODO: move to settings
+const DISPLAY_NAME = "Lohit";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey =
@@ -46,6 +63,71 @@ function cleanAuthCallbackUrl() {
   for (const key of callbackKeys) url.searchParams.delete(key);
   url.hash = "";
   window.history.replaceState(window.history.state, "", url.toString());
+}
+
+type SignedInShellProps = {
+  client: SupabaseClient;
+  userId: string;
+  signingOut: boolean;
+  error: string;
+  onSignOut: () => void;
+};
+
+function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedInShellProps) {
+  const [activeTab, setActiveTab] = useState<TabName>("Today");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const dayKey = currentPulseDayKey(now);
+  const plan = useMemo(
+    () => buildDayPlan(templateForDayKey(dayKey), dayKey),
+    [dayKey],
+  );
+
+  return (
+    <main className="today-shell">
+      {activeTab === "Today" ? (
+        <Today
+          plan={plan}
+          now={now}
+          greeting={greetingFor(istParts(now).hour, DISPLAY_NAME)}
+          dateLabel={dateLabelFor(now)}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      ) : (
+        <section className="coming-soon" aria-labelledby="coming-soon-title">
+          <h1 id="coming-soon-title">{activeTab}</h1>
+          <p>Coming soon</p>
+        </section>
+      )}
+
+      <BottomTabs activeTab={activeTab} onChange={setActiveTab} />
+
+      <Sheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Settings"
+      >
+        <div className="settings-stack">
+          <PushSettings client={client} userId={userId} />
+          <button
+            className="button button-primary"
+            disabled={signingOut}
+            onClick={onSignOut}
+            type="button"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+          {error ? <p role="alert">{error}</p> : null}
+        </div>
+      </Sheet>
+    </main>
+  );
 }
 
 export function Auth() {
@@ -155,6 +237,18 @@ export function Auth() {
 
   const missingConfig = !supabaseUrl || !supabaseKey;
 
+  if (!missingConfig && !loading && session && supabase) {
+    return (
+      <SignedInShell
+        client={supabase}
+        userId={session.user.id}
+        signingOut={signingOut}
+        error={error}
+        onSignOut={() => void handleSignOut()}
+      />
+    );
+  }
+
   return (
     <main className="home-shell">
       <section className="home-card" aria-labelledby="home-title">
@@ -172,19 +266,6 @@ export function Auth() {
           <p role="status" className="home-copy">
             Restoring your session…
           </p>
-        ) : session && supabase ? (
-          <div className="grid gap-4">
-            <p className="home-copy">You are signed in.</p>
-            <PushSettings client={supabase} userId={session.user.id} />
-            <button
-              className="button button-primary"
-              disabled={signingOut}
-              onClick={() => void handleSignOut()}
-              type="button"
-            >
-              {signingOut ? "Signing out…" : "Sign out"}
-            </button>
-          </div>
         ) : (
           <form
             className="grid gap-3"

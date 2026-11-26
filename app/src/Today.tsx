@@ -1,0 +1,199 @@
+import type { ReactNode } from "react";
+import { istParts, nowNext, type DayPlan, type ScheduleItem } from "@pulse/shared";
+import { Card, IconChip, RingGauge } from "./ui";
+
+export interface TodayProps {
+  plan: DayPlan;
+  now: Date;
+  greeting: string;
+  dateLabel: string;
+  syncPending?: boolean;
+  onOpenSettings: () => void;
+  onItemDone?: (item: ScheduleItem) => void;
+  onStartTimer?: (item: ScheduleItem) => void;
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Good morning" / "Good afternoon" / "Good evening" by IST hour; ", <name>" appended only when given. */
+export function greetingFor(hour: number, name?: string): string {
+  const part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const trimmed = name?.trim();
+  return trimmed ? `Good ${part}, ${trimmed}` : `Good ${part}`;
+}
+
+/** "Wed, 26 Nov" for the IST calendar date of `now`. */
+export function dateLabelFor(now: Date): string {
+  const p = istParts(now);
+  const weekday = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+  return `${WEEKDAYS[weekday]}, ${p.day} ${MONTHS[p.month - 1]}`;
+}
+
+/** "HH:MM" in IST regardless of the device timezone. */
+export function formatTime(instant: Date): string {
+  const p = istParts(instant);
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}
+
+function formatLeft(now: Date, end: Date): string {
+  const mins = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 60_000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0) return m > 0 ? `${h}h ${m}m left` : `${h}h left`;
+  return `${m}m left`;
+}
+
+function isNews(item: ScheduleItem): boolean {
+  return item.meta.newsReading === true;
+}
+
+function itemTitle(item: ScheduleItem): string {
+  return isNews(item) ? "News reading" : item.title;
+}
+
+function timeRange(item: ScheduleItem): string {
+  if (item.startAt && item.endAt) return `${formatTime(item.startAt)} – ${formatTime(item.endAt)}`;
+  if (item.startAt) return formatTime(item.startAt);
+  if (item.endAt) return `until ${formatTime(item.endAt)}`;
+  return "";
+}
+
+function GearIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+    </svg>
+  );
+}
+
+export function Today({
+  plan,
+  now,
+  greeting,
+  dateLabel,
+  syncPending = false,
+  onOpenSettings,
+  onItemDone,
+  onStartTimer,
+}: TodayProps) {
+  const { current, next, fraction } = nowNext(plan, now);
+  const nowMs = now.getTime();
+
+  return (
+    <div className="today">
+      <header className="today-header">
+        <div className="today-heading">
+          <p className="section-kicker">{dateLabel}</p>
+          <h1>{greeting}</h1>
+        </div>
+        <div className="today-header-actions">
+          <span
+            className={`sync-dot ${syncPending ? "sync-dot-pending" : "sync-dot-ok"}`}
+            role="img"
+            aria-label={syncPending ? "Changes waiting to sync" : "All changes synced"}
+          />
+          <IconChip label="Settings" icon={<GearIcon />} tone="blue" onClick={onOpenSettings} />
+        </div>
+      </header>
+
+      <Card className="now-card" role="group" aria-label="Now and next">
+        <p className="now-label">{current ? "NOW" : "NOTHING NOW"}</p>
+        {current ? (
+          <>
+            <h2 className="now-title">{itemTitle(current)}</h2>
+            <p className="now-meta">
+              <span>{timeRange(current)}</span>
+              {current.endAt ? <span className="now-left">{formatLeft(now, current.endAt)}</span> : null}
+            </p>
+            <div
+              className="now-bar"
+              role="progressbar"
+              aria-label="Time elapsed in this block"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(fraction * 100)}
+            >
+              <span className="now-bar-fill" style={{ width: `${fraction * 100}%` }} />
+            </div>
+            <div className="now-actions">
+              <button className="button button-primary" type="button" onClick={() => onItemDone?.(current)}>
+                Done
+              </button>
+              <button className="button button-secondary" type="button" onClick={() => onStartTimer?.(current)}>
+                Start timer
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="now-empty">No block is running right now.</p>
+        )}
+        <div className="next-line">
+          <span className="next-label">NEXT</span>
+          {next?.startAt ? (
+            <>
+              <span className="next-time">{formatTime(next.startAt)}</span>
+              <span className="next-title">{itemTitle(next)}</span>
+            </>
+          ) : (
+            <span className="next-title">Nothing else planned today</span>
+          )}
+        </div>
+      </Card>
+
+      <Card className="score-card" role="group" aria-label="Score">
+        <div className="score-ring">
+          <RingGauge value={0} max={100} label="Today" valueLabel="—" />
+        </div>
+        <div className="score-side">
+          <div className="score-averages">
+            <div className="score-avg">
+              <span className="stat-label">Week avg</span>
+              <span className="score-avg-value">—</span>
+            </div>
+            <div className="score-avg">
+              <span className="stat-label">Month avg</span>
+              <span className="score-avg-value">—</span>
+            </div>
+          </div>
+          <p className="score-note">Scores start once you log a few days</p>
+        </div>
+      </Card>
+
+      <section aria-labelledby="timeline-title">
+        <h2 id="timeline-title" className="timeline-title">
+          Timeline
+        </h2>
+        <ol className="timeline">
+          {plan.items.map((item) => {
+            const end = item.endAt?.getTime() ?? item.startAt?.getTime() ?? Number.POSITIVE_INFINITY;
+            const isCurrent = item === current;
+            const state = isCurrent ? "current" : end <= nowMs ? "past" : "future";
+            const minutes = typeof item.meta.minutes === "number" ? item.meta.minutes : null;
+            return (
+              <li
+                key={item.sortOrder}
+                className={`timeline-row timeline-${state}`}
+                aria-current={isCurrent ? "step" : undefined}
+              >
+                <span className="timeline-time">
+                  {item.startAt ? formatTime(item.startAt) : item.endAt ? `→ ${formatTime(item.endAt)}` : "—"}
+                </span>
+                <span className="timeline-dot" aria-hidden="true" />
+                <span className="timeline-copy">
+                  <span className="timeline-name">{itemTitle(item)}</span>
+                  {isNews(item) && minutes !== null ? (
+                    <span className="timeline-sub">{minutes} min</span>
+                  ) : item.startAt && item.endAt ? (
+                    <span className="timeline-sub">{timeRange(item)}</span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </div>
+  );
+}
