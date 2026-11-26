@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["_shared/**/*.ts", "vitest.config.ts", "ambient.d.ts"],
+  "exclude": ["node_modules", "**/*_test.ts", "*/index.ts"]
+}
