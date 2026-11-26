@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T2.4b class overrides migration + data layer.
+**Next action:** T2.4c class UI; hosted push of `20261127000000_class_overrides.sql` awaiting user OK.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
@@ -18,6 +18,7 @@ _(Nothing right now.)_
 - Hosted reads: `npx -y supabase@latest db query --remote --read-only "<sql>"`. Hosted writes/migrations need the user's OK first.
 - T2.4 split into a/b/c; T3.2 and T3.4 split. Plan: T2.4a ∥ T3.1, then T2.4b → T2.4c → phase-2 gate, then T3.2a → T3.2b → T3.3 → T3.4a/b → T3.5.
 - T2.4a + T3.1 DONE (checker PASS; 211 tests). Carry-overs: `fetchDayClasses` filters by source_date only — moved-in classes from another day missing (fix in T2.4b/c). `evaluate()` re-reports `missed` every call after window close — dispatcher (T3.2b) must persist a 'missed' resolution. pnpm not on PATH: use `npx -y pnpm@11.25.0`.
+- T2.4b DONE (checker PASS by SQL review). Migration `20261127000000_class_overrides.sql` NOT yet on hosted; pgTAP `supabase/tests/timetable_reconciliation.test.sql` (plan 52) never executed — no Postgres here. Git NOT pushed past 421e6f2 until the migration is live (app reads new columns). Attendance = item_logs `class:<id>` + meta.attendance. Extra classes via `add_extra_class` RPC (origin='manual'). Nit: RPC lacks explicit end>start/blank-title errors (constraints still enforce).
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -60,8 +61,8 @@ _(Nothing right now.)_
 | T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | DONE |
 | T2.3c | Verify college sync, triggers and second fixture | §4, §14 | DONE |
 | T2.4a | Classes on Today: fetch day's `classes` as `busy` into `buildDayPlan`, class items on Now/Next + timeline, unseen change alerts listed | §4 Class handling, Change alerts | DONE |
-| T2.4b | Class overrides migration + data layer: attendance (Attended/Missed/Medical/Cancelled), manual cancel/restore/move/extra; reconcile honours manual changes, auto-restore, sheet-wins-on-cell-change | §4 Cancelled classes, Manual changes | IN PROGRESS |
-| T2.4c | Class UI: attendance prompt after class end, struck-through cancelled class with Restore, move / add-extra sheets | §4 | TODO |
+| T2.4b | Class overrides migration + data layer: attendance (Attended/Missed/Medical/Cancelled), manual cancel/restore/move/extra; reconcile honours manual changes, auto-restore, sheet-wins-on-cell-change | §4 Cancelled classes, Manual changes | DONE |
+| T2.4c | Class UI: attendance prompt after class end, struck-through cancelled class with Restore, move / add-extra sheets | §4 | IN PROGRESS |
 
 ## Phase 3: Reminder engine and check-ins (PRD §6)
 | ID | Ticket | PRD | Status |

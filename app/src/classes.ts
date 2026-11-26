@@ -86,10 +86,18 @@ export async function fetchDayClasses(
   client: SupabaseClient,
   dayKey: string,
 ): Promise<PlanClass[]> {
+  // Effective start = manual_starts_at ?? source_starts_at must fall inside the
+  // Pulse day, so classes moved in from another day are found too.
+  const { start, end } = pulseDayRange(dayKey);
+  const s = start.toISOString();
+  const e = end.toISOString();
   const { data, error } = await client
     .from("classes")
     .select(CLASS_COLUMNS)
-    .eq("source_date", dayKey)
+    .or(
+      `and(manual_starts_at.gte.${s},manual_starts_at.lt.${e}),` +
+        `and(manual_starts_at.is.null,source_starts_at.gte.${s},source_starts_at.lt.${e})`,
+    )
     .order("source_starts_at", { ascending: true });
   if (error) throw error;
   return mapClassRows((data ?? []) as ClassRow[], dayKey);

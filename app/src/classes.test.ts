@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   busyFromClasses,
   fetchDayAlerts,
+  fetchDayClasses,
   mapClassRows,
   rowToPlanClass,
   type ClassRow,
@@ -110,5 +111,47 @@ describe("fetchDayAlerts", () => {
       ["gte", "queued_at", "2026-11-25T22:30:00.000Z"],
       ["lt", "queued_at", "2026-11-26T22:30:00.000Z"],
     ]);
+  });
+});
+
+describe("moved-in classes", () => {
+  it("keeps a class whose manual time is in the day although its source date is another", () => {
+    const moved = row({
+      id: "in",
+      source_date: "2026-11-25",
+      source_starts_at: "2026-11-25T04:00:00.000Z",
+      source_ends_at: "2026-11-25T05:30:00.000Z",
+      manual_state: "moved",
+      manual_starts_at: "2026-11-26T06:00:00.000Z",
+      manual_ends_at: "2026-11-26T07:00:00.000Z",
+    });
+    const movedOut = row({
+      id: "out",
+      manual_state: "moved",
+      manual_starts_at: "2026-11-27T06:00:00.000Z",
+      manual_ends_at: "2026-11-27T07:00:00.000Z",
+    });
+    expect(mapClassRows([moved, movedOut], DAY).map((c) => c.id)).toEqual(["in"]);
+  });
+});
+
+describe("fetchDayClasses", () => {
+  it("filters on the effective start inside the Pulse day, not source_date", async () => {
+    const calls: unknown[][] = [];
+    const builder = {
+      select: () => builder,
+      eq: (...a: unknown[]) => (calls.push(["eq", ...a]), builder),
+      or: (...a: unknown[]) => (calls.push(["or", ...a]), builder),
+      order: () => Promise.resolve({ data: [row()], error: null }),
+    };
+    const client = { from: () => builder } as never;
+    const out = await fetchDayClasses(client, DAY);
+    expect(out).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    const filter = String(calls[0]?.[1]);
+    expect(calls[0]?.[0]).toBe("or");
+    expect(filter).toContain("manual_starts_at.gte.2026-11-25T22:30:00.000Z");
+    expect(filter).toContain("source_starts_at.lt.2026-11-26T22:30:00.000Z");
+    expect(filter).toContain("manual_starts_at.is.null");
   });
 });
