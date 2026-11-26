@@ -22,6 +22,7 @@ _(Nothing right now.)_
 - PHASE 2 DONE (tag phase-2): gate PASS, 246 tests (shared 101, functions 54, app 91).
 - T3.2a DONE (checker PASS by SQL review; pgTAP plan 30 not run). Migration NOT on hosted yet. Cron `dispatch-reminders` every minute posts Bearer <vault dispatch_cron_secret> to /functions/v1/dispatch-reminders; function must verify via `check_dispatch_secret` (service_role) and deploy with verify_jwt=false. Hosted has pg_cron/pg_net available (not installed), vault+pgcrypto installed.
 - T3.2b DONE (checker PASS, 258 tests). Owner via COLLEGE_TIMETABLE_OWNER_ID env (same as ingest). Item keys habit:/must:<day>:<order>, class:<id>. Alerts at-least-once (re-send if mark fails). shared/reminders.ts + dayplan.ts now use `.ts` imports; root tsconfig has allowImportingTsExtensions (user-approved). Deno resolution unverified locally (no deno) — deploy will reveal. app/src/push.ts only handles 'pulse-test' → fix in T3.3.
+- T3.3 DONE (2nd checker PASS, 296 tests). Action tokens = stateless HMAC `userId.expiry.sig` (12 h, bound to user/day/item), HKDF-SHA256 key from SUPABASE_SERVICE_ROLE_KEY. Meal Done from notification writes `reminders` only. Function handlers now type-checked via supabase/functions/tsconfig include.
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -73,7 +74,7 @@ _(Nothing right now.)_
 | T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | DONE |
 | T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | DONE |
 | T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | DONE |
-| T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | IN PROGRESS |
+| T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | DONE |
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | TODO |
 | T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | TODO |
 | T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | TODO |

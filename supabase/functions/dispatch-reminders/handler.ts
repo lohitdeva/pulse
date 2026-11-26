@@ -7,6 +7,7 @@
  * persists what happened. Nothing personal is logged and no notification text is
  * stored in the database.
  */
+import { signActionToken } from "../notification-action/handler.ts";
 import { buildDayPlan, templateForDayKey } from "../../../shared/dayplan.ts";
 import type { PlanClass } from "../../../shared/dayplan.ts";
 import { waterTotals } from "../../../shared/logging.ts";
@@ -158,7 +159,7 @@ export interface PushPayload {
   title: string;
   body: string;
   tag: string;
-  data: { itemKey: string; dayKey: string; url: string };
+  data: { itemKey: string; dayKey: string; url: string; actionToken?: string };
   actions: PushAction[];
 }
 
@@ -190,6 +191,7 @@ const DONE_SNOOZE_ACTIONS: PushAction[] = [
   { action: "done", title: "Done" },
   { action: "snooze", title: "Snooze 10 min" },
 ];
+const DONE_ONLY_ACTIONS: PushAction[] = [{ action: "done", title: "Done" }];
 const ATTENDANCE_ACTIONS: PushAction[] = [
   { action: "attended", title: "Attended" },
   { action: "missed", title: "Missed" },
@@ -473,6 +475,13 @@ export function createDispatchRemindersHandler(
         });
       };
 
+      // Signed per item so the notification's Done / Snooze / Skip can reach the backend.
+      const tokenSecret = deps.readEnv("SUPABASE_SERVICE_ROLE_KEY");
+      const tokenFor = async (itemKey: string): Promise<{ actionToken?: string }> =>
+        tokenSecret
+          ? { actionToken: await signActionToken(tokenSecret, ownerId, dayKey, itemKey, now) }
+          : {};
+
       for (const n of result.send) {
         const item = itemByKey.get(n.key);
         if (!item) continue;
@@ -481,8 +490,13 @@ export function createDispatchRemindersHandler(
           title: n.title,
           body: n.body,
           tag: n.key,
-          data: { itemKey: n.key, dayKey, url: `/?focus=${encodeURIComponent(n.key)}` },
-          actions: DONE_SNOOZE_ACTIONS,
+          data: {
+            itemKey: n.key,
+            dayKey,
+            url: `/?focus=${encodeURIComponent(n.key)}`,
+            ...(await tokenFor(n.key)),
+          },
+          actions: item.level === "nudge" ? DONE_ONLY_ACTIONS : DONE_SNOOZE_ACTIONS,
         });
         // Retry next minute if nothing reached a device.
         if (outcome.delivered > 0) {
@@ -499,7 +513,12 @@ export function createDispatchRemindersHandler(
           title: `How was ${item.title}?`,
           body: "Tell Pulse if you attended.",
           tag: key,
-          data: { itemKey: key, dayKey, url: `/?focus=${encodeURIComponent(key)}` },
+          data: {
+            itemKey: key,
+            dayKey,
+            url: `/?focus=${encodeURIComponent(key)}`,
+            ...(await tokenFor(key)),
+          },
           actions: ATTENDANCE_ACTIONS,
         });
         if (outcome.delivered > 0) {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { istDateTimeLocalToUtc } from "../../../shared/time";
+import { verifyActionToken } from "../notification-action/handler";
 import {
   createDispatchRemindersHandler,
   type AlertRow,
@@ -15,6 +16,7 @@ import {
 } from "./handler";
 
 const SECRET = "dispatch-secret-for-tests-only";
+const SERVICE_KEY = "service-role-key-for-tests-only";
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const DAY = "2026-11-26"; // Thursday: weekday template
 const at = (hhmm: string) => new Date(istDateTimeLocalToUtc(`${DAY}T${hhmm}`));
@@ -115,7 +117,12 @@ function setup(opts: Setup) {
   });
 
   const handler = createDispatchRemindersHandler({
-    readEnv: (name) => (name === "COLLEGE_TIMETABLE_OWNER_ID" ? OWNER : undefined),
+    readEnv: (name) =>
+      name === "COLLEGE_TIMETABLE_OWNER_ID"
+        ? OWNER
+        : name === "SUPABASE_SERVICE_ROLE_KEY"
+          ? SERVICE_KEY
+          : undefined,
     store,
     push,
     now: () => clock.now,
@@ -156,6 +163,19 @@ describe("dispatch-reminders", () => {
     expect(lunch).toMatchObject({ sent_count: 1, kind: "meal", level: "must" });
     expect(lunch.last_sent_at).toBe(at("13:00").toISOString());
     expect(t.logs).toEqual([{ status: "sent", item_key: payload.data.itemKey }]);
+  });
+
+  it("signs an action token bound to the owner, day and item", async () => {
+    const t = setup({ now: at("13:00") });
+    await t.call();
+    const { data } = t.pushed[0]!;
+    expect(typeof data.actionToken).toBe("string");
+    expect(
+      await verifyActionToken(SERVICE_KEY, data.actionToken!, DAY, data.itemKey, at("13:00")),
+    ).toBe(OWNER);
+    expect(
+      await verifyActionToken(SERVICE_KEY, data.actionToken!, DAY, "must:other", at("13:00")),
+    ).toBeNull();
   });
 
   it("does not push again when called twice in the same minute", async () => {

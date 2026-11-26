@@ -237,6 +237,23 @@ export async function configurePushWorker(
   });
 }
 
+/**
+ * Re-sends the worker configuration when this device already has a push
+ * subscription. Returns true when the worker was configured.
+ */
+export async function refreshPushWorkerConfiguration(
+  registration: {
+    active: PushWorkerMessenger | null;
+    pushManager: { getSubscription(): Promise<unknown> };
+  },
+  configuration: PushWorkerConfiguration,
+): Promise<boolean> {
+  const existing = await registration.pushManager.getSubscription();
+  if (!existing || !registration.active) return false;
+  await configurePushWorker(registration.active, configuration);
+  return true;
+}
+
 export async function sendTestPush(
   input: {
     supabaseUrl: string;
@@ -293,6 +310,50 @@ interface PushNotificationOptions {
   data: unknown;
   actions: Array<{ action: string; title: string }>;
   tag: string;
+  renotify?: boolean;
+}
+
+export type ReminderActionName = "done" | "snooze" | "skip" | "attended" | "missed";
+
+export interface ReminderNotificationAction {
+  action: ReminderActionName;
+  title: string;
+}
+
+const ACTION_DONE: ReminderNotificationAction = { action: "done", title: "Done" };
+const ACTION_SNOOZE: ReminderNotificationAction = {
+  action: "snooze",
+  title: "Snooze 10 min",
+};
+const ACTION_SKIP: ReminderNotificationAction = { action: "skip", title: "Skip" };
+const REMINDER_ACTION_NAMES = new Set<string>([
+  "done",
+  "snooze",
+  "skip",
+  "attended",
+  "missed",
+]);
+
+/**
+ * Buttons per reminder kind, decided from the item key. Must-do items get Done and
+ * Snooze (plus Skip where the platform shows 3 or more actions), nudges get Done,
+ * attendance prompts get Attended / Missed, timetable alerts and water get none.
+ */
+export function reminderActionsFor(
+  itemKey: string,
+  maxActions = 2,
+): ReminderNotificationAction[] {
+  if (itemKey.startsWith("alert:") || itemKey.startsWith("water:")) return [];
+  if (itemKey.endsWith(":attendance")) {
+    return [
+      { action: "attended", title: "Attended" },
+      { action: "missed", title: "Missed" },
+    ];
+  }
+  if (itemKey.startsWith("habit:")) return [ACTION_DONE];
+  return maxActions >= 3
+    ? [ACTION_DONE, ACTION_SNOOZE, ACTION_SKIP]
+    : [ACTION_DONE, ACTION_SNOOZE];
 }
 
 interface PushWorkerCache {
@@ -307,6 +368,8 @@ interface PushWindowClient {
 }
 
 export interface PushWorkerScope {
+  /** Override for tests; defaults to `Notification.maxActions`, else 2. */
+  maxActions?: number;
   addEventListener(type: string, listener: (event: unknown) => void): void;
   caches: {
     open(name: string): Promise<PushWorkerCache>;
@@ -339,7 +402,7 @@ interface WorkerEvent {
   waitUntil?(promise: Promise<unknown>): void;
 }
 
-interface PushPayload {
+interface TestPushPayload {
   type: "pulse-test";
   notificationId: string;
   capability: string;
@@ -347,6 +410,21 @@ interface PushPayload {
   title: string;
   body: string;
 }
+
+interface ReminderPushPayload {
+  type: "pulse-reminder";
+  title: string;
+  body: string;
+  tag: string;
+  data: {
+    itemKey: string;
+    dayKey: string;
+    url: string;
+    actionToken?: string;
+  };
+}
+
+type PushPayload = TestPushPayload | ReminderPushPayload;
 
 const workerConfigCache = "pulse-push-worker-config-v1";
 const workerConfigPath = "/__pulse_push_worker_config__";
@@ -372,7 +450,39 @@ export function installPushWorkerHandlers(
   scope.addEventListener("push", (rawEvent) => {
     const event = rawEvent as WorkerEvent;
     const payload = readPushPayload(event.data);
-    if (!payload) return;
+    if (!payload) {
+      // A malformed reminder must still alert: show a generic notification
+      // (no item data, no actions) that opens the app.
+      if (isReminderPushType(event.data)) {
+        event.waitUntil?.(
+          scope.registration.showNotification("Pulse reminder", {
+            body: "Open Pulse to see what is due.",
+            data: { kind: "reminder-generic" },
+            actions: [],
+            tag: "pulse-reminder-generic",
+            renotify: true,
+          }),
+        );
+      }
+      return;
+    }
+    if (payload.type === "pulse-reminder") {
+      const { itemKey, dayKey, url, actionToken } = payload.data;
+      const actions = actionToken
+        ? reminderActionsFor(itemKey, platformMaxActions(scope))
+        : [];
+      event.waitUntil?.(
+        scope.registration.showNotification(payload.title, {
+          body: payload.body,
+          data: { kind: "reminder", itemKey, dayKey, url, actionToken },
+          actions,
+          tag: payload.tag,
+          // Reminders repeat under the same tag: alert again each time.
+          renotify: true,
+        }),
+      );
+      return;
+    }
     event.waitUntil?.(
       scope.registration.showNotification(payload.title, {
         body: payload.body,
@@ -393,6 +503,27 @@ export function installPushWorkerHandlers(
   scope.addEventListener("notificationclick", (rawEvent) => {
     const event = rawEvent as WorkerEvent;
     event.notification?.close();
+    const rawData = event.notification?.data as { kind?: unknown } | null;
+    if (rawData?.kind === "reminder-generic") {
+      if (!event.action) event.waitUntil?.(openClientAt(scope, "/"));
+      return;
+    }
+    const reminder = readReminderNotificationData(event.notification?.data);
+    if (reminder) {
+      if (event.action && REMINDER_ACTION_NAMES.has(event.action)) {
+        event.waitUntil?.(
+          postReminderAction(
+            scope,
+            reminder,
+            event.action as ReminderActionName,
+            fetcher,
+          ),
+        );
+      } else if (!event.action) {
+        event.waitUntil?.(openClientAt(scope, reminder.url));
+      }
+      return;
+    }
     const data = readNotificationData(event.notification?.data);
     if (event.action === "done" || event.action === "snooze") {
       if (!data) return;
@@ -403,7 +534,7 @@ export function installPushWorkerHandlers(
     }
 
     if (!event.action) {
-      event.waitUntil?.(focusNotificationTestPanel(scope));
+      event.waitUntil?.(openClientAt(scope, `/${NOTIFICATION_TEST_HASH}`));
     }
   });
 }
@@ -479,6 +610,20 @@ async function readWorkerConfiguration(
   }
 }
 
+function isReminderPushType(data: WorkerEvent["data"]): boolean {
+  if (!data || typeof data !== "object" || !("json" in data)) return false;
+  try {
+    const value = (data as { json(): unknown }).json();
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      (value as { type?: unknown }).type === "pulse-reminder"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function readPushPayload(data: WorkerEvent["data"]): PushPayload | null {
   if (!data || typeof data !== "object" || !("json" in data)) return null;
   let value: unknown;
@@ -490,7 +635,10 @@ function readPushPayload(data: WorkerEvent["data"]): PushPayload | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
   }
-  const payload = value as Partial<PushPayload>;
+  if ((value as { type?: unknown }).type === "pulse-reminder") {
+    return readReminderPayload(value as Record<string, unknown>);
+  }
+  const payload = value as Partial<TestPushPayload>;
   if (
     payload.type !== "pulse-test" ||
     !isUuid(payload.notificationId) ||
@@ -502,7 +650,123 @@ function readPushPayload(data: WorkerEvent["data"]): PushPayload | null {
   ) {
     return null;
   }
-  return payload as PushPayload;
+  return payload as TestPushPayload;
+}
+
+const ITEM_KEY_PATTERN = /^[A-Za-z0-9:_-]{1,120}$/;
+const DAY_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isAppPath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 200 &&
+    /^\/(?![/\\])[^\s]*$/.test(value)
+  );
+}
+
+function readReminderPayload(
+  payload: Record<string, unknown>,
+): ReminderPushPayload | null {
+  const data = payload.data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+  const { itemKey, dayKey, url, actionToken } = data as Record<string, unknown>;
+  if (
+    typeof payload.title !== "string" ||
+    typeof payload.body !== "string" ||
+    typeof itemKey !== "string" ||
+    !ITEM_KEY_PATTERN.test(itemKey) ||
+    typeof dayKey !== "string" ||
+    !DAY_KEY_PATTERN.test(dayKey) ||
+    !isAppPath(url) ||
+    (actionToken !== undefined &&
+      (typeof actionToken !== "string" || actionToken.length > 300))
+  ) {
+    return null;
+  }
+  return {
+    type: "pulse-reminder",
+    title: payload.title,
+    body: payload.body,
+    tag: typeof payload.tag === "string" && payload.tag ? payload.tag : itemKey,
+    data: {
+      itemKey,
+      dayKey,
+      url,
+      ...(actionToken === undefined ? {} : { actionToken }),
+    },
+  };
+}
+
+interface ReminderNotificationData {
+  itemKey: string;
+  dayKey: string;
+  url: string;
+  actionToken?: string;
+}
+
+function readReminderNotificationData(
+  data: unknown,
+): ReminderNotificationData | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+  const value = data as Record<string, unknown>;
+  if (
+    value.kind !== "reminder" ||
+    typeof value.itemKey !== "string" ||
+    !ITEM_KEY_PATTERN.test(value.itemKey) ||
+    typeof value.dayKey !== "string" ||
+    !DAY_KEY_PATTERN.test(value.dayKey) ||
+    !isAppPath(value.url)
+  ) {
+    return null;
+  }
+  return {
+    itemKey: value.itemKey,
+    dayKey: value.dayKey,
+    url: value.url,
+    ...(typeof value.actionToken === "string"
+      ? { actionToken: value.actionToken }
+      : {}),
+  };
+}
+
+function platformMaxActions(scope: PushWorkerScope): number {
+  if (typeof scope.maxActions === "number") return scope.maxActions;
+  const max = (globalThis as { Notification?: { maxActions?: unknown } })
+    .Notification?.maxActions;
+  return typeof max === "number" ? max : 2;
+}
+
+async function postReminderAction(
+  scope: PushWorkerScope,
+  data: ReminderNotificationData,
+  action: ReminderActionName,
+  fetcher: typeof fetch,
+): Promise<void> {
+  if (!data.actionToken) return;
+  const configuration = await readWorkerConfiguration(scope);
+  if (!configuration) return;
+  try {
+    await fetcher(configuration.actionEndpoint, {
+      method: "POST",
+      headers: {
+        apikey: configuration.apikey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        actionToken: data.actionToken,
+        itemKey: data.itemKey,
+        dayKey: data.dayKey,
+        action,
+      }),
+      redirect: "error",
+    });
+  } catch {
+    // Tokens and item keys must never be copied into logs or URLs.
+  }
 }
 
 interface NotificationActionData {
@@ -556,10 +820,11 @@ async function postNotificationAction(
   }
 }
 
-async function focusNotificationTestPanel(
+async function openClientAt(
   scope: PushWorkerScope,
+  path: string,
 ): Promise<void> {
-  const target = new URL(`/${NOTIFICATION_TEST_HASH}`, scope.location.origin);
+  const target = new URL(path, scope.location.origin);
   const clients = await scope.clients.matchAll({
     type: "window",
     includeUncontrolled: true,

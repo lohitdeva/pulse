@@ -6,6 +6,8 @@ import {
   focusNotificationPanel,
   installPushWorkerHandlers,
   NOTIFICATION_TEST_HASH,
+  refreshPushWorkerConfiguration,
+  reminderActionsFor,
   requestPushPermission,
   runPushStage,
   sendTestPush,
@@ -270,6 +272,28 @@ describe("service worker push actions", () => {
     }
   });
 
+  it("refreshes the worker configuration only for an existing subscription", async () => {
+    const worker: PushWorkerMessenger = {
+      postMessage: vi.fn((_message: unknown, transfer: Transferable[]) => {
+        (transfer[0] as MessagePort).postMessage({ ok: true });
+      }),
+    };
+    const configuration = { actionEndpoint, apikey };
+    const none = { active: worker, pushManager: { getSubscription: async () => null } };
+    await expect(refreshPushWorkerConfiguration(none, configuration)).resolves.toBe(false);
+    expect(worker.postMessage).not.toHaveBeenCalled();
+
+    const enrolled = {
+      active: worker,
+      pushManager: { getSubscription: async () => ({ endpoint: "x" }) },
+    };
+    await expect(refreshPushWorkerConfiguration(enrolled, configuration)).resolves.toBe(true);
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      { type: "pulse-push-config", ...configuration },
+      expect.any(Array),
+    );
+  });
+
   it("posts Done and Snooze to the exact configured backend with the public key", async () => {
     const { scope, handlers } = makeWorkerScope();
     const fetcher = vi.fn(async () => new Response("{}", { status: 200 }));
@@ -397,6 +421,197 @@ describe("notification test panel focus", () => {
 
     expect(panel.focus).toHaveBeenCalledOnce();
     expect(panel.focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+});
+
+const reminderPayload = (itemKey: string, extra: Record<string, unknown> = {}) => ({
+  type: "pulse-reminder",
+  title: "Lunch",
+  body: "Mess closes at 2:30.",
+  tag: itemKey,
+  data: {
+    itemKey,
+    dayKey: "2026-11-26",
+    url: `/?focus=${encodeURIComponent(itemKey)}`,
+    actionToken: "user.123.sig",
+    ...extra,
+  },
+  actions: [],
+});
+
+describe("reminder notification action sets", () => {
+  it.each([
+    ["must:2026-11-26:4", 2, ["done", "snooze"]],
+    ["must:2026-11-26:4", 3, ["done", "snooze", "skip"]],
+    ["must:2026-11-26:4:winddown", 2, ["done", "snooze"]],
+    ["habit:2026-11-26:2", 3, ["done"]],
+    ["class:abc:attendance", 3, ["attended", "missed"]],
+    ["alert:abc", 3, []],
+    ["water:11", 3, []],
+  ])("%s with %i slots shows %j", (itemKey, max, expected) => {
+    expect(reminderActionsFor(itemKey, max).map((a) => a.action)).toEqual(expected);
+  });
+});
+
+describe("service worker reminder pushes", () => {
+  it("shows every reminder payload with its item data, tag and actions", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    installPushWorkerHandlers(scope);
+
+    await dispatchPush(handlers, reminderPayload("must:2026-11-26:4"));
+    await dispatchPush(handlers, reminderPayload("habit:2026-11-26:2"));
+    await dispatchPush(handlers, reminderPayload("class:abc:attendance"));
+    await dispatchPush(handlers, reminderPayload("alert:abc", { actionToken: undefined }));
+
+    const show = vi.mocked(scope.registration.showNotification);
+    expect(show).toHaveBeenCalledTimes(4);
+    const actionsOf = (index: number) =>
+      (show.mock.calls[index]![1] as { actions: { action: string }[] }).actions.map(
+        (a) => a.action,
+      );
+    expect(actionsOf(0)).toEqual(["done", "snooze"]);
+    expect(actionsOf(1)).toEqual(["done"]);
+    expect(actionsOf(2)).toEqual(["attended", "missed"]);
+    expect(actionsOf(3)).toEqual([]);
+    expect(show.mock.calls[0]![1]).toMatchObject({
+      tag: "must:2026-11-26:4",
+      renotify: true,
+      data: {
+        kind: "reminder",
+        itemKey: "must:2026-11-26:4",
+        url: "/?focus=must%3A2026-11-26%3A4",
+      },
+    });
+  });
+
+  it("shows a generic notification for a malformed reminder payload", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    installPushWorkerHandlers(scope);
+    await dispatchPush(handlers, { type: "pulse-reminder", title: "x", data: {} });
+    await dispatchPush(handlers, { type: "other" });
+
+    const show = vi.mocked(scope.registration.showNotification);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(show.mock.calls[0]![0]).toBe("Pulse reminder");
+    expect(show.mock.calls[0]![1]).toMatchObject({
+      data: { kind: "reminder-generic" },
+    });
+
+    await dispatchClick(handlers, "", { kind: "reminder-generic" });
+    expect(scope.clients.openWindow).toHaveBeenCalledWith("https://pulse.example/");
+  });
+
+  it("adds Skip when the platform allows three actions", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    (scope as { maxActions?: number }).maxActions = 3;
+    installPushWorkerHandlers(scope);
+    await dispatchPush(handlers, reminderPayload("must:2026-11-26:4"));
+    const options = vi.mocked(scope.registration.showNotification).mock
+      .calls[0]![1] as { actions: { action: string }[] };
+    expect(options.actions.map((a) => a.action)).toEqual(["done", "snooze", "skip"]);
+  });
+
+  it("ignores unknown types; malformed reminders get the generic notification, never item data", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    installPushWorkerHandlers(scope);
+    await dispatchPush(handlers, { type: "other", title: "x", body: "y" });
+    const show = vi.mocked(scope.registration.showNotification);
+    expect(show).not.toHaveBeenCalled();
+
+    await dispatchPush(handlers, reminderPayload("must:1", { url: "https://evil.example/" }));
+    await dispatchPush(handlers, reminderPayload("must:1", { url: "//evil.example/" }));
+    await dispatchPush(handlers, reminderPayload("bad key!"));
+    await dispatchPush(handlers, reminderPayload("must:1", { dayKey: "today" }));
+    expect(show).toHaveBeenCalledTimes(4);
+    for (const call of show.mock.calls) {
+      expect(call[0]).toBe("Pulse reminder");
+      expect(call[1]).toMatchObject({ data: { kind: "reminder-generic" }, actions: [] });
+    }
+  });
+
+  it("posts each action with the token to the configured endpoint", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    const fetcher = vi.fn(async () => new Response("{}", { status: 200 }));
+    installPushWorkerHandlers(scope, fetcher);
+    await configureWorker(handlers, actionEndpoint);
+    const data = {
+      kind: "reminder",
+      itemKey: "must:2026-11-26:4",
+      dayKey: "2026-11-26",
+      url: "/?focus=must%3A2026-11-26%3A4",
+      actionToken: "user.123.sig",
+    };
+
+    for (const action of ["done", "snooze", "skip", "attended", "missed"]) {
+      await dispatchClick(handlers, action, data);
+    }
+    await dispatchClick(handlers, "unknown", data);
+
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(fetcher).toHaveBeenNthCalledWith(
+      3,
+      actionEndpoint,
+      expect.objectContaining({
+        method: "POST",
+        redirect: "error",
+        headers: { apikey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionToken: "user.123.sig",
+          itemKey: "must:2026-11-26:4",
+          dayKey: "2026-11-26",
+          action: "skip",
+        }),
+      }),
+    );
+  });
+
+  it("does nothing for an action without a token or configuration", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    const fetcher = vi.fn(async () => new Response("{}", { status: 200 }));
+    installPushWorkerHandlers(scope, fetcher);
+    const data = {
+      kind: "reminder",
+      itemKey: "must:2026-11-26:4",
+      dayKey: "2026-11-26",
+      url: "/",
+      actionToken: "user.123.sig",
+    };
+    await dispatchClick(handlers, "done", data); // not configured yet
+    await configureWorker(handlers, actionEndpoint);
+    await dispatchClick(handlers, "done", { ...data, actionToken: undefined });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("opens or navigates the app to the focused item on a body tap", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    const openedWindow = { url: "", navigate: vi.fn(), focus: vi.fn(async () => undefined) };
+    vi.mocked(scope.clients.openWindow).mockResolvedValue(openedWindow);
+    installPushWorkerHandlers(scope);
+    const data = {
+      kind: "reminder",
+      itemKey: "must:2026-11-26:4",
+      dayKey: "2026-11-26",
+      url: "/?focus=must%3A2026-11-26%3A4",
+    };
+
+    await dispatchClick(handlers, "", data);
+    expect(scope.clients.openWindow).toHaveBeenCalledWith(
+      "https://pulse.example/?focus=must%3A2026-11-26%3A4",
+    );
+
+    const openClient = {
+      url: "https://pulse.example/",
+      navigate: vi.fn(async () => undefined),
+      focus: vi.fn(async () => undefined),
+    };
+    vi.mocked(scope.clients.matchAll).mockResolvedValue([
+      openClient,
+    ] as unknown as Awaited<ReturnType<typeof scope.clients.matchAll>>);
+    await dispatchClick(handlers, "", data);
+    expect(openClient.navigate).toHaveBeenCalledWith(
+      "https://pulse.example/?focus=must%3A2026-11-26%3A4",
+    );
+    expect(openClient.focus).toHaveBeenCalledOnce();
   });
 });
 

@@ -4,6 +4,13 @@
     "allowImportingTsExtensions": true,
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["_shared/**/*.ts", "vitest.config.ts", "ambient.d.ts"],
+  "include": [
+    "_shared/**/*.ts",
+    "notification-action/handler.ts",
+    "dispatch-reminders/handler.ts",
+    "ingest-timetable/handler.ts",
+    "vitest.config.ts",
+    "ambient.d.ts"
+  ],
   "exclude": ["node_modules", "**/*_test.ts", "*/index.ts"]
 }

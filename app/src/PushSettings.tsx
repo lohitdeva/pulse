@@ -5,6 +5,7 @@ import {
   createNotificationActionEndpoint,
   enrollPushSubscription,
   focusNotificationPanel,
+  refreshPushWorkerConfiguration,
   requestPushPermission,
   runPushStage,
   sendTestPush,
@@ -35,6 +36,34 @@ export function PushSettings({ client, userId }: PushSettingsProps) {
     focusPanelFromHash();
     window.addEventListener("hashchange", focusPanelFromHash);
     return () => window.removeEventListener("hashchange", focusPanelFromHash);
+  }, []);
+
+  // Already-enrolled devices refresh the worker's cached action-endpoint config.
+  useEffect(() => {
+    if (
+      !supabaseUrl ||
+      !supabaseKey ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (cancelled) return;
+        await refreshPushWorkerConfiguration(registration, {
+          actionEndpoint: createNotificationActionEndpoint(supabaseUrl),
+          apikey: supabaseKey,
+        });
+      } catch {
+        // Best effort; the Enable button repeats this.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleEnable() {

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   istParts,
   nowNext,
@@ -125,6 +125,68 @@ function GearIcon(): ReactNode {
   );
 }
 
+/**
+ * Item keys a timeline row answers to when a notification opens `/?focus=<itemKey>`.
+ * Mirrors the dispatcher's keys: `must:`/`habit:` template blocks and `class:<id>`.
+ */
+export function focusKeysFor(dayKey: string, item: ScheduleItem): string[] {
+  const keys: string[] = [];
+  const habit = habitItemKey(dayKey, item);
+  if (habit) keys.push(habit);
+  if (item.source === "class") {
+    if (typeof item.meta.classId === "string") keys.push(`class:${item.meta.classId}`);
+  } else {
+    keys.push(`must:${dayKey}:${item.templateBlockSortOrder ?? `s${item.sortOrder}`}`);
+  }
+  return keys;
+}
+
+/** `?focus=` value with the attendance / wind-down suffixes removed, or null. */
+export function readFocusKey(search: string): string | null {
+  const raw = new URLSearchParams(search).get("focus");
+  if (!raw || raw.length > 120) return null;
+  return raw.replace(/:(attendance|winddown)$/, "");
+}
+
+/**
+ * Renders nothing. When the app was opened from a notification (`/?focus=<itemKey>`),
+ * scrolls that timeline row into view and highlights it for a few seconds. Runs after
+ * every render until the row exists, because the plan can still be loading.
+ */
+function FocusFromNotification() {
+  const handled = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (handled.current) return;
+    const key = readFocusKey(window.location.search);
+    if (!key) {
+      handled.current = true;
+      return;
+    }
+    const row = [...document.querySelectorAll<HTMLElement>("[data-item-keys]")].find(
+      (el) => el.dataset.itemKeys?.split(" ").includes(key),
+    );
+    if (!row) return;
+    handled.current = true;
+    row.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    row.style.outline = "2px solid var(--pulse-mint)";
+    row.style.outlineOffset = "4px";
+    row.style.borderRadius = "8px";
+    timer.current = setTimeout(() => {
+      row.style.outline = "";
+      row.style.outlineOffset = "";
+      row.style.borderRadius = "";
+    }, 4000);
+  });
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return null;
+}
+
 export function Today({
   plan,
   alerts = [],
@@ -240,6 +302,7 @@ export function Today({
 
       {logging}
 
+      <FocusFromNotification />
       <section aria-labelledby="timeline-title">
         <h2 id="timeline-title" className="timeline-title">
           Timeline
@@ -253,6 +316,7 @@ export function Today({
             const minutes = typeof item.meta.minutes === "number" ? item.meta.minutes : null;
             const itemKey = habitItemKey(plan.dayKey, item);
             const habitStatus = itemKey ? habitStatuses[itemKey] : undefined;
+            const rowKeys = focusKeysFor(plan.dayKey, item);
             const habitLabel = `${itemTitle(item)}${
               timeRange(item) ? ` at ${timeRange(item)}` : ""
             }`;
@@ -261,6 +325,7 @@ export function Today({
                 key={item.sortOrder}
                 className={`timeline-row timeline-${state}${isCancelled(item) ? " timeline-cancelled" : ""}`}
                 aria-current={isCurrent ? "step" : undefined}
+                data-item-keys={rowKeys.join(" ")}
               >
                 <span className="timeline-time">
                   {item.startAt ? formatTime(item.startAt) : item.endAt ? `→ ${formatTime(item.endAt)}` : "—"}
