@@ -10,8 +10,8 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 
 **▶️ T1.2 — apply the new migration to hosted Supabase (needs your DB password).** Phase 0 push acceptance is fully complete; nothing pending there. The schedule-core migration is committed but not yet applied to the hosted project. Run from the repo root:
 
-1. If the project isn't linked yet: `npx -y pnpm@11.25.0 exec supabase link --project-ref <your-project-ref>` (enter the DB password when asked). The ref is in your Supabase dashboard URL.
-2. `npx -y pnpm@11.25.0 exec supabase db push` — applies `supabase/migrations/20261126020000_schedule_core.sql` to hosted. (Docker isn't available here, so this can't be done locally; the push goes straight to hosted.)
+1. If the project isn't linked yet: `npx -y pnpm@11.25.0 exec supabase link --project-ref <ref>` (enter the DB password when asked). `<ref>` is ONLY the subdomain — the `xxxx` in `https://xxxx.supabase.co`, not the full URL. If it says you're not logged in, run `npx -y pnpm@11.25.0 exec supabase login` first.
+2. `npx -y pnpm@11.25.0 exec supabase db push --remote` — applies `supabase/migrations/20261126020000_schedule_core.sql` to the linked hosted project. **`--remote` is required on supabase CLI 3.x** — without it, `db push` targets the local Docker stack (not available here) and fails with ECONNREFUSED on 127.0.0.1:54322.
 3. In Supabase Studio → Table editor, confirm the four tables exist — `day_templates`, `template_blocks`, `days`, `schedule_items` — each with RLS enabled.
 4. Sign in once on the deployed app, then in Studio check that your `day_templates` has 2 rows (weekday, weekend), `template_blocks` is populated, and `settings.data.facility_hours` is set. A second sign-in must change nothing.
 5. Tell the planner the outcome (or any error) so T1.2 can be closed out.
