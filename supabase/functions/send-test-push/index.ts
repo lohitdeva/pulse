@@ -1,3 +1,4 @@
+import "../_shared/base64-polyfill.ts";
 import { encrypt, vapidPublicKey } from "jsr:@daaku/webpush@0.2.0";
 import {
   hashCapability,
