@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Start T1.5c habit logging and then integrate the T1.6b task screen.
+**Next action:** Build habit timeline controls and verify T1.5c.
 **Current phase:** 1
 
 ## Needs you
@@ -14,9 +14,9 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 
 ## Handoff notes
 
-- T1.5b checker passed after the lost-ack water retry fix. T1.6a passed; both production migrations verified.
-- Start T1.5c habit logging and then integrate the T1.6b task screen.
-- Main auto-deploys to production. Hosted migrations are current.
+- T1.5b and T1.6a verified and committed; hosted migrations current.
+- Build habit timeline controls and verify T1.5c.
+- Main auto-deploys to production. Apply pending hosted migrations before push.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -43,7 +43,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | T1.4 | Today screen: Now/Next card, score card placeholder, timeline; layout per §13 | §13 Today screen | DONE |
 | T1.5a | Logging tables (`item_logs`, `meal_logs`, `water_logs`, RLS) + Dexie offline queue + sync engine wired to the Today sync dot; unit tests | §13 Interaction (offline-first) | DONE |
 | T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | DONE |
-| T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | TODO |
+| T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | IN PROGRESS |
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete in the signed-in app | §5 Task fields | TODO |
 
