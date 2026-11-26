@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleItem } from "@pulse/shared";
 
+const seededState = vi.hoisted(() => ({ queue: [] as unknown[] }));
+
 vi.mock("./classOverrides", () => ({
   cancelClass: vi.fn().mockResolvedValue(undefined),
   restoreClass: vi.fn().mockResolvedValue(undefined),
@@ -12,6 +14,28 @@ vi.mock("./classOverrides", () => ({
   addExtraClass: vi.fn().mockResolvedValue("new-id"),
   logAttendance: vi.fn().mockResolvedValue(1),
 }));
+
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    // Lets a test seed the first useState calls of one render (server rendering cannot set state).
+    useState: ((initial: unknown) => {
+      const seeded = seededState.queue;
+      if (seeded.length > 0) return actual.useState(seeded.shift());
+      return actual.useState(initial);
+    }) as typeof actual.useState,
+  };
+});
+
+// The real Sheet portals into document.body, which server rendering has no access to.
+vi.mock("./ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./ui")>();
+  return {
+    ...actual,
+    Sheet: ({ open, children }: { open: boolean; children?: ReactNode }) => (open ? <div>{children}</div> : null),
+  };
+});
 
 import {
   AttendancePrompt,
@@ -169,6 +193,33 @@ describe("cancel and restore", () => {
     vi.mocked(overrides.cancelClass).mockRejectedValueOnce(new Error("secret detail"));
     expect(await api.cancel("c1")).toBe(SAVE_ERROR);
     expect(reload).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("save error placement", () => {
+  const after = new Date("2026-11-26T06:00:00.000Z");
+  const escaped = renderToStaticMarkup(<>{SAVE_ERROR}</>);
+  const count = (html: string) => html.split(escaped).length - 1;
+  // ClassRowActions state order: sheet, editing, busy, error.
+  const withState = (sheet: "menu" | "move" | null) => {
+    seededState.queue = [sheet, false, false, SAVE_ERROR];
+    try {
+      return markup(classItem(), after);
+    } finally {
+      seededState.queue = [];
+    }
+  };
+
+  it("renders the error exactly once while the move sheet is open", () => {
+    expect(count(withState("move"))).toBe(1);
+  });
+
+  it("renders the error exactly once while the menu sheet is open", () => {
+    expect(count(withState("menu"))).toBe(1);
+  });
+
+  it("renders the error exactly once when the sheet is closed", () => {
+    expect(count(withState(null))).toBe(1);
   });
 });
 

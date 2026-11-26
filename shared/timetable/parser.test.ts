@@ -157,3 +157,39 @@ describe("parseSectionCTimetable", () => {
     });
   });
 });
+
+describe("parseSectionCTimetable on the live-grid fixture", () => {
+  interface LiveFixture extends TimetableBridgePayload {
+    expected_section_C_summary: { item_count: number; distinct_dates: number };
+  }
+  const live = JSON.parse(
+    readFileSync(new URL("../../docs/reference/timetable-live-fixture.json", import.meta.url), "utf8"),
+  ) as LiveFixture;
+
+  it("parses without throwing into 160 Section C items across 83 dates", () => {
+    let records: ReturnType<typeof parseSectionCTimetable> = [];
+    expect(() => {
+      records = parseSectionCTimetable(live);
+    }).not.toThrow();
+    expect(records).toHaveLength(160);
+    expect(records).toHaveLength(live.expected_section_C_summary.item_count);
+    expect(new Set(records.map((r) => r.date)).size).toBe(83);
+    expect(new Set(records.map((r) => r.date)).size).toBe(live.expected_section_C_summary.distinct_dates);
+  });
+
+  it("applies an all-section merged cell once, spanning its merged slots", () => {
+    const records = parseSectionCTimetable(live).filter((r) => r.date === "2026-11-08");
+    const [item] = records;
+    expect(records).toHaveLength(1);
+    expect(item).toMatchObject({ kind: "event", title: "Schedule Event 42" });
+    expect([localTime(item?.startsAt ?? ""), localTime(item?.endsAt ?? "")]).toEqual(["09:30", "17:15"]);
+  });
+
+  it("ignores the non-class S.No. rows below the grid", () => {
+    const records = parseSectionCTimetable(live);
+    expect(live.values.some((row) => row[0] === "S.No.")).toBe(true);
+    for (const n of [100, 101, 102, 103, 104, 105, 106]) {
+      expect(records.some((r) => r.title.includes(`Schedule Event ${n}`))).toBe(false);
+    }
+  });
+});

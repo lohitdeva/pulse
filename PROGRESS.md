@@ -2,8 +2,8 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Phase 2 gate: add parser test over live fixture + single-error assertion, re-gate, tag phase-2.
-**Current phase:** 2 — Timetable sync
+**Next action:** T3.2a reminders tables + pg_cron dispatcher job.
+**Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
@@ -19,6 +19,7 @@ _(Nothing right now.)_
 - T2.4 split into a/b/c; T3.2 and T3.4 split. Plan: T2.4a ∥ T3.1, then T2.4b → T2.4c → phase-2 gate, then T3.2a → T3.2b → T3.3 → T3.4a/b → T3.5.
 - T2.4a + T3.1 DONE (checker PASS; 211 tests). Carry-overs: `fetchDayClasses` filters by source_date only — moved-in classes from another day missing (fix in T2.4b/c). `evaluate()` re-reports `missed` every call after window close — dispatcher (T3.2b) must persist a 'missed' resolution. pnpm not on PATH: use `npx -y pnpm@11.25.0`.
 - T2.4b DONE (checker PASS by SQL review). Migration `20261127000000_class_overrides.sql` applied to hosted 2026-11-27 with user OK (verified: origin col, add_extra_class, RLS, 160 sheet rows); pgTAP `supabase/tests/timetable_reconciliation.test.sql` (plan 52) never executed — no Postgres here. Attendance = item_logs `class:<id>` + meta.attendance. Extra classes via `add_extra_class` RPC (origin='manual'). Nit: RPC lacks explicit end>start/blank-title errors (constraints still enforce).
+- PHASE 2 DONE (tag phase-2): gate PASS, 246 tests (shared 101, functions 54, app 91).
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -68,7 +69,7 @@ _(Nothing right now.)_
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | DONE |
-| T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | TODO |
+| T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | IN PROGRESS |
 | T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | TODO |
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | TODO |
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | TODO |
@@ -160,3 +161,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-27 00:12 · Codex · T2.3c diagnosis · waiting for the rejected grid from the private college sheet.
 - 2026-11-27 00:20 · Codex · T2.3c fix deployed · waiting for college rerun and trigger installation.
 - 2026-11-27 · Claude Code · took over from Codex; T2.2 + T2.3c DONE (hosted sync verified) · starting T2.4a ∥ T3.1.
+- 2026-11-27 · Claude Code · T2.4a–c + T3.1 DONE; class_overrides migration on hosted; **PHASE 2 COMPLETE** (tag phase-2) · starting T3.2a.
