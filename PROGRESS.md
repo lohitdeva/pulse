@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Retry enrollment on the S23, verify Done and Snooze receipts, then run the phase-end check.
+**Next action:** Diagnose hosted worker activation and verify in a real browser engine.
 **Current phase:** 0
 
 ## Needs you
@@ -24,6 +24,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 | T0.4a | Web Push backend, VAPID setup and authenticated test push actions | §6 actions, §14 Push | DONE |
 | T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | DONE |
 | T0.4c | Repair stalled S23 push enrollment | §6, §14 Push | DONE |
+| T0.4d | Restore production worker activation | §14 Push | IN PROGRESS |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | WAITING ON USER |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
