@@ -2,13 +2,13 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS) + seed weekday/weekend templates from the §4 table and facility hours (mess, gym) into settings. (T0.4d deploy + S23 push test still pending under Needs you.)
+**Next action:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` (RLS) + seed weekday/weekend templates from the §4 table and facility hours (mess, gym) into settings. (T0.4d fix now deployed + verified live; the S23 functional push test is the remaining user step under Needs you.)
 **Current phase:** 0
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. **Redeploy so the T0.4d fix goes live.** The hosted site is CONFIRMED still the old broken build (sw.js 4835 B, `addAll(g.map(...))`, 10 precache entries), which is why the S23 push still errors. Preferred: connect the Vercel `pulse-tau-liard` project to the new GitHub repo — Project → Settings → Git → Connect `lohitdeva/pulse`, production branch `main`, **Root Directory `./`** (root `vercel.json` drives the monorepo build), then Redeploy. Or redeploy manually as in T0.5. After deploy, confirm https://pulse-tau-liard.vercel.app/sw.js is ~4794 B and its install uses `addAll([...` (not `g.map`). On the S23, fully close and reopen Pulse so the new worker loads.
+1. ✅ **Done — the T0.4d fix is deployed and verified live** (sw.js now 4794 B; the service worker registers and activates, `serviceWorker.ready` resolves — confirmed in a real browser engine, 26 Nov). On the S23, fully close Pulse and reopen it (or clear the app's site data) so the new worker installs, then run the enrollment + notification test below.
 2. On the S23, open https://pulse-tau-liard.vercel.app/ in Chrome. Reinstall/refresh Pulse from the Chrome menu and launch it from the home screen.
 3. Sign in with your Pulse email. Open the newest magic link on the S23 in the same Chrome profile, then return to the installed app.
 4. Close and reopen Pulse to load the worker-activation fix. Under Notifications, tap **Enable push on this device** and allow notifications — the worker should now become ready (no 10s timeout). Tap **Send test notification** and tap **Done** on the Android notification.
@@ -20,7 +20,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 - **Last tool:** Claude Code (planner).
 - **T1.1 DONE (committed):** `shared/time.ts` + `shared/time.test.ts`; `shared/index.ts` re-exports. Fixed +5:30 IST offset (no deps, no I/O, portable to Deno Edge Functions). API: `istParts`, `pulseDayKey`, `startOfPulseDay`, `pulseDayRange` (half-open), `currentPulseDayKey`, `blockInstants`, consts `IST_TZ`/`IST_OFFSET_MINUTES`/`DAY_BOUNDARY_HOUR`. Checker PASS (all stages exit 0; shared 20 tests incl. fake-clock, app 12). `IST_TZ` currently unused (harmless).
 - **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
-- **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse is set; `main`@65c36b0 is pushed (user pushed it). But the LIVE Vercel site is still the OLD pre-fix build — verified in-browser (sw.js 4835 B, raw `addAll(g.map)`, 10 entries, no SW registration). So the S23 error persists only because the fix isn't deployed. Vercel is NOT yet Git-connected to the repo; connecting it (root dir `./`) or a manual redeploy will publish the fix. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
+- **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse set; `main` pushed by user. **T0.4d fix is now DEPLOYED and VERIFIED LIVE** — in-browser on pulse-tau-liard: sw.js 4794 B, install uses `addAll([...])`, the SW registers and ACTIVATES, `serviceWorker.ready` resolves (previously went redundant). Remaining: the S23 functional push test (enroll + test notification + Done/Snooze) — user step. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
 - **Next ticket:** T1.2 — tables `day_templates`, `template_blocks`, `days`, `schedule_items` with RLS; seed weekday + weekend templates from the §4 table and facility hours (mess, gym) into settings. Read PRD §4. Use `shared/time.ts` for time math. (Supabase/migrations — mind whether DB access needs the user.)
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -132,3 +132,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 — T0.4c fixed unbounded enrollment waits and preserved the permission gesture. Verified updated production bundle and worker. S23 retry pending; no subscription existed at diagnosis.
 - 2026-11-26 11:05 · Claude (chat) · no tickets · Added CLAUDE.md, `.claude/agents/` and shared handoff rules so Codex and Claude Code can alternate. Next session continues T0.4d or parks it.
 - 2026-11-26 · Claude Code · T0.4d + T1.1 DONE · T0.4d: deduped SW precache `addAll` (root-caused in a real browser) + dark manifest; verified on local build; user deploy + S23 test pending. T1.1: `shared/time.ts` IST + 4 AM day boundary with fake-clock tests. Both checker PASS. Stopped after T1.1 per plan; next is T1.2.
+- 2026-11-26 · Claude Code · Repo pushed to github.com/lohitdeva/pulse (user); T0.4d fix deployed to Vercel and VERIFIED LIVE in-browser (sw.js 4794 B, SW now activates). S23 functional push test still pending.
