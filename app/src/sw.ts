@@ -46,9 +46,7 @@ serviceWorker.addEventListener("install", (rawEvent) => {
   event.waitUntil(
     (async () => {
       const cache = await serviceWorker.caches.open(precacheName);
-      await cache.addAll(
-        precacheEntries.map((entry) => new URL(entry.url, serviceWorker.location.origin).href),
-      );
+      await cache.addAll([...precacheUrls]);
       await serviceWorker.skipWaiting();
     })(),
   );

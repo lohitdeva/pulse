@@ -2,27 +2,27 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T0.4d — dedupe `sw.ts` precache `addAll`; verify worker activation on a local prod build. Then user deploys + runs the S23 push test.
+**Next action:** T1.1 — `shared/time.ts` IST helpers + 4 AM day boundary with fake-clock tests. (T0.4d fix landed and verified on a local build; user deploy + S23 push test pending under Needs you.)
 **Current phase:** 0
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. On the S23, open https://pulse-tau-liard.vercel.app/ in Chrome. Install Pulse from the Chrome menu and launch it from the home screen.
-2. Sign in with your Pulse email. Open the newest magic link on the S23 in the same Chrome profile, then return to the installed app.
-3. Close and reopen Pulse to load the enrollment fix. Under Notifications, tap **Enable push on this device** and allow notifications. Tap **Send test notification** and tap **Done** on the Android notification.
-4. Send a second test and tap **Snooze 10 min**. Expand the notification if the buttons are collapsed. Tell the planner the outcome for each button or the exact error so it can check the backend receipts.
+1. **Deploy the new build to Vercel first.** This clone has no git remote and the Vercel CLI isn't installed, so deploy the way you did for T0.5 (e.g. `vercel --prod` from your machine, or your Git-connected deploy). The fix is the service-worker precache dedupe — without it the hosted worker never activates. After deploying, confirm https://pulse-tau-liard.vercel.app/sw.js serves the new build.
+2. On the S23, open https://pulse-tau-liard.vercel.app/ in Chrome. Reinstall/refresh Pulse from the Chrome menu and launch it from the home screen.
+3. Sign in with your Pulse email. Open the newest magic link on the S23 in the same Chrome profile, then return to the installed app.
+4. Close and reopen Pulse to load the worker-activation fix. Under Notifications, tap **Enable push on this device** and allow notifications — the worker should now become ready (no 10s timeout). Tap **Send test notification** and tap **Done** on the Android notification.
+5. Send a second test and tap **Snooze 10 min**. Expand the notification if the buttons are collapsed. Tell the planner the outcome for each button or the exact error so it can check the backend receipts.
 
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
 - **Last tool:** Claude Code (planner).
-- **Current ticket:** T0.4d IN PROGRESS — fixing worker activation.
-- **Root cause (CONFIRMED in a real browser engine, 26 Nov):** `app/src/sw.ts` install handler calls `cache.addAll()` on a **non-deduplicated** list. VitePWA injects the manifest icons + webmanifest *and* the glob re-captures them, so `pulse-192.png`, `pulse-512.png`, `manifest.webmanifest` each appear twice → `addAll` rejects `InvalidStateError: duplicate requests` → install fails → worker redundant → never activates → `serviceWorker.ready` never resolves → S23 enrollment times out at 10s.
-- **Prior lead was wrong:** all 10 precache URLs return 200; no failed URL. Deduping (`addAll([...precacheUrls])`, the Set already built at sw.ts:40) **succeeds** in-browser.
-- **Fix:** dedupe `cache.addAll` to use `precacheUrls`; also set manifest `theme_color`/`background_color` to the dark app bg (#0b0e14; was light #f7f7f5).
-- **To try next:** build + browser-pane verify the SW activates locally; then user deploys and retries the S23.
-- **After T0.4d:** continue to Phase 1 T1.1 (`shared/time.ts`). T0.5 device acceptance still WAITING ON USER.
+- **T0.4d DONE (committed):** `app/src/sw.ts` install now `cache.addAll([...precacheUrls])` (the deduped Set); manifest `theme_color`/`background_color` → `#0b0e14`. Checker PASS (typecheck/lint/test/build all exit 0; app tests 12/12, shared 1/1).
+- **Root cause (confirmed in a real browser):** VitePWA injected the manifest icons + webmanifest AND the glob re-captured them, so `pulse-192.png`, `pulse-512.png`, `manifest.webmanifest` appeared twice → `addAll` rejected `InvalidStateError: duplicate requests` → worker never activated. All 10 URLs were 200 (prior "failed URL" lead was wrong).
+- **Verified on the local prod build:** the shipped 10-entry `addAll` fails; the fixed `addAll([...precacheUrls])` succeeds (10→7 cached). Built `sw.js` contains the fix. (A SW can't be *registered* against `vite preview` inside the browser pane — environment limit; real activation confirms on the HTTPS deploy.)
+- **User-gated:** deploy the new build, then re-run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
+- **Current ticket:** T1.1 — `shared/time.ts` (IST, 4 AM day boundary, fake-clock tests). `shared/` is flat (`index.ts` is `export {}`); add `shared/time.ts` + `shared/time.test.ts`, re-export from index. Read only PRD §4 + §14.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -35,7 +35,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | T0.4a | Web Push backend, VAPID setup and authenticated test push actions | §6 actions, §14 Push | DONE |
 | T0.4b | Settings push enrollment, test control and service worker actions | §6 actions, §14 Push | DONE |
 | T0.4c | Repair stalled S23 push enrollment | §6, §14 Push | DONE |
-| T0.4d | Restore production worker activation | §14 Push | IN PROGRESS |
+| T0.4d | Restore production worker activation | §14 Push | DONE |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | WAITING ON USER |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
@@ -132,4 +132,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 — T0.4a/b passed, backend and PWA deployed. T0.5 software checks passed. Production routes, bundled public keys, worker, manifest and icons verified via HTTP. S23 install, sign-in, delivery and action receipts pending.
 - 2026-11-26 — T0.4c fixed unbounded enrollment waits and preserved the permission gesture. Verified updated production bundle and worker. S23 retry pending; no subscription existed at diagnosis.
 - 2026-11-26 11:05 · Claude (chat) · no tickets · Added CLAUDE.md, `.claude/agents/` and shared handoff rules so Codex and Claude Code can alternate. Next session continues T0.4d or parks it.
-- 2026-11-26 · Claude Code · T0.4d root-caused in a real browser (duplicate precache URLs → `addAll` rejects); fixing dedupe + dark manifest colors, then continuing to T1.1.
+- 2026-11-26 · Claude Code · T0.4d DONE: root-caused in a real browser (duplicate precache URLs → `addAll` rejects), deduped `addAll` + dark manifest colors; checker PASS; fix verified on local build. User deploy + S23 test pending. Continuing to T1.1.
