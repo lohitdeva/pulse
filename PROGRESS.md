@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Start T2.3b authenticated endpoint and deployment.
+**Next action:** Implement and deploy T2.3b authenticated endpoint.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
@@ -55,7 +55,7 @@ College script properties configured per user. Live sync and trigger setup follo
 | T2.1 | `shared/timetable/parser.ts`: raw grid + merged ranges → Section C classes; tests from `docs/reference/timetable-fixture.json` covering every §4 cell variant, plus a synthetic exam cell → Exam item | §4 | DONE |
 | T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | WAITING ON USER |
 | T2.3a | Atomic snapshot, class reconciliation and change-alert queue migration | §4, §14 | DONE |
-| T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | TODO |
+| T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | IN PROGRESS |
 | T2.3c | Verify college sync, triggers and second fixture | §4, §14 | TODO |
 | T2.4 | Classes on Today and the timeline; attendance prompt (Attended/Missed/Medical/Cancelled); cancelled classes struck through with Restore (manual) and auto-restore when the sheet re-lists them; move and add-extra-class overrides | §4 Class handling, Cancelled classes, Manual changes | TODO |
 
