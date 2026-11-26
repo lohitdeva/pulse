@@ -58,6 +58,43 @@ a:focus-visible {
   line-height: 1.05;
 }
 
+.push-settings {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--pulse-border);
+  border-radius: 20px;
+  background: var(--pulse-surface-raised);
+}
+
+.push-settings h2 {
+  margin: 0;
+  font-family: var(--pulse-font);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.push-settings-copy,
+.push-settings-error {
+  margin: 0;
+  color: var(--pulse-muted);
+  line-height: 1.5;
+}
+
+.push-settings-error {
+  color: var(--pulse-danger, #b54747);
+}
+
+.push-settings-actions {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.push-test-button {
+  border: 1px solid var(--pulse-border);
+}
+
 .home-copy {
   margin: 12px 0 24px;
   color: var(--pulse-muted);

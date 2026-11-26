@@ -1,5 +1,6 @@
 import { createClient, type Session } from "@supabase/supabase-js";
 import { useEffect, useState, type FormEvent } from "react";
+import { PushSettings } from "./PushSettings";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey =
@@ -160,9 +161,10 @@ export function Auth() {
           <p role="status" className="home-copy">
             Restoring your session…
           </p>
-        ) : session ? (
+        ) : session && supabase ? (
           <div className="grid gap-4">
             <p className="home-copy">You are signed in.</p>
+            <PushSettings client={supabase} userId={session.user.id} />
             <button
               className="button button-primary"
               disabled={signingOut}

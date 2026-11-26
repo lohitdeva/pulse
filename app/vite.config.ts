@@ -9,6 +9,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,webmanifest}"],
+      },
       registerType: "autoUpdate",
       injectRegister: null,
       manifest: {
