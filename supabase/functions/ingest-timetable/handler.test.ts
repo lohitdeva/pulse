@@ -8,12 +8,29 @@ interface Fixture extends TimetableBridgePayload {
   expected_section_C: unknown[];
 }
 
+interface LiveFixture extends TimetableBridgePayload {
+  expected_section_C_summary: {
+    item_count: number;
+    distinct_dates: number;
+    by_kind: Record<string, number>;
+    duplicate_base_keys: number;
+    repeated_base_keys_across_dates: number;
+    overlapping_pairs: number;
+  };
+}
+
 const fixture = JSON.parse(
   readFileSync(
     new URL("../../../docs/reference/timetable-fixture.json", import.meta.url),
     "utf8",
   ),
 ) as Fixture;
+const liveFixture = JSON.parse(
+  readFileSync(
+    new URL("../../../docs/reference/timetable-live-fixture.json", import.meta.url),
+    "utf8",
+  ),
+) as LiveFixture;
 const secret = "college-sync-secret-0123456789abcdef";
 const ownerId = "00000000-0000-4000-8000-000000000001";
 const serviceRoleKey = "service-role-key-for-test-only";
@@ -64,6 +81,66 @@ function fixtureWithHeaderChanges(changes: Record<number, string>) {
     header[Number(column)] = value;
   }
   return { values, merges: fixture.merges };
+}
+
+function summarizeSectionC(items: Array<Record<string, unknown>>) {
+  const byKind: Record<string, number> = {};
+  const dates = new Set<string>();
+  const baseKeyCounts = new Map<string, number>();
+  const baseKeyDates = new Map<string, Set<string>>();
+  let overlappingPairs = 0;
+
+  for (const item of items) {
+    const date = String(item.date);
+    const kind = String(item.kind);
+    dates.add(date);
+    byKind[kind] = (byKind[kind] ?? 0) + 1;
+
+    const normalizedTitle = String(item.title)
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    const baseKey =
+      kind === "class"
+        ? `class|${String(item.course).trim().toUpperCase()}|${String(item.session)}`
+        : kind === "exam"
+          ? `exam|${String(item.course ?? "").trim().toLowerCase()}|${normalizedTitle}`
+          : `event|${normalizedTitle}`;
+    const dailyBaseKey = `${date}|${baseKey}`;
+    baseKeyCounts.set(dailyBaseKey, (baseKeyCounts.get(dailyBaseKey) ?? 0) + 1);
+    const keyDates = baseKeyDates.get(baseKey) ?? new Set<string>();
+    keyDates.add(date);
+    baseKeyDates.set(baseKey, keyDates);
+  }
+
+  for (let left = 0; left < items.length; left += 1) {
+    const leftItem = items[left]!;
+    for (let right = left + 1; right < items.length; right += 1) {
+      const rightItem = items[right]!;
+      if (
+        leftItem.date === rightItem.date &&
+        String(leftItem.startsAt) < String(rightItem.endsAt) &&
+        String(rightItem.startsAt) < String(leftItem.endsAt)
+      ) {
+        overlappingPairs += 1;
+      }
+    }
+  }
+
+  return {
+    item_count: items.length,
+    distinct_dates: dates.size,
+    by_kind: byKind,
+    duplicate_base_keys: [...baseKeyCounts.values()].reduce(
+      (sum, count) => sum + Math.max(0, count - 1),
+      0,
+    ),
+    repeated_base_keys_across_dates: [...baseKeyDates.values()].reduce(
+      (sum, keyDates) => sum + Math.max(0, keyDates.size - 1),
+      0,
+    ),
+    overlapping_pairs: overlappingPairs,
+  };
 }
 
 describe("ingest timetable endpoint", () => {
@@ -144,6 +221,43 @@ describe("ingest timetable endpoint", () => {
         merges: ["A1:ZZ999999999"],
       },
     ],
+    [
+      "merge extending more than one trailing column",
+      {
+        values: [
+          [
+            "Date",
+            "Day",
+            "Sections",
+            "09:30 AM 11:00 AM",
+            "11:15 AM 12:45 PM",
+            "LUNCH 12:45 PM - 02:00 PM",
+            "02:00 PM 03:30 PM",
+            "03:45 PM 05:15 PM",
+          ],
+        ],
+        merges: ["A1:J1"],
+      },
+    ],
+    [
+      "non-date marker on a section row",
+      {
+        values: [
+          [
+            "Date",
+            "Day",
+            "Sections",
+            "09:30 AM 11:00 AM",
+            "11:15 AM 12:45 PM",
+            "LUNCH 12:45 PM - 02:00 PM",
+            "02:00 PM 03:30 PM",
+            "03:45 PM 05:15 PM",
+          ],
+          ["S.No.", "Monday", "C", "MM-II-1", "", "", "", ""],
+        ],
+        merges: [],
+      },
+    ],
   ])("does not reconcile %s", async (_label, body) => {
     const fetcher = vi.fn<typeof fetch>();
     const response = await makeHandler(fetcher)(makeRequest(body));
@@ -199,6 +313,32 @@ describe("ingest timetable endpoint", () => {
     });
     expect(rpcPayload.p_parsed_items).toHaveLength(
       fixture.expected_section_C.length,
+    );
+  });
+
+  it("reconciles the full privacy-safe downloaded grid through the mocked RPC", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ ok: true }));
+    const response = await makeHandler(fetcher)(
+      makeRequest({ values: liveFixture.values, merges: liveFixture.merges }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    const rpcPayload = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
+      p_raw_payload: { values: string[][]; merges: string[] };
+      p_parsed_items: Array<Record<string, unknown>>;
+    };
+    expect(rpcPayload.p_raw_payload).toEqual({
+      version: 1,
+      values: liveFixture.values,
+      merges: liveFixture.merges,
+    });
+    expect(summarizeSectionC(rpcPayload.p_parsed_items)).toEqual(
+      liveFixture.expected_section_C_summary,
     );
   });
 

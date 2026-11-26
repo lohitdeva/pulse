@@ -187,7 +187,10 @@ function parseMerge(
     endRow >= rowCount ||
     startColumn < 0 ||
     endColumn < startColumn ||
-    endColumn >= columnCount ||
+    startColumn >= columnCount ||
+    // `getDisplayValues()` can omit one trailing blank column covered by a
+    // merged range returned by `getMergedRanges()`.
+    endColumn > Math.min(columnCount, MAX_COLUMNS - 1) ||
     (endRow - startRow + 1) * (endColumn - startColumn + 1) > MAX_MERGE_AREA
   ) {
     throw new InvalidPayloadError();

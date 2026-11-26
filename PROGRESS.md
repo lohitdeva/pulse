@@ -2,13 +2,14 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T2.3c: inspect the rejected live grid, reproduce HTTP 400 locally and fix the verified incompatibility.
+**Next action:** T2.3c: run the first college sync against the corrected deployment and confirm triggers.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-Downloaded grid available locally; no user action until corrected endpoint is verified.
+1. Run `syncCollegeTimetable` once in the college Apps Script editor.
+2. After it completes successfully, run `installCollegeTimetableTriggers` once and confirm both runs completed. If sync fails, report the HTTP status.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
@@ -16,7 +17,7 @@ Downloaded grid available locally; no user action until corrected endpoint is ve
 
 - Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
 - T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 implementation passed offline checks; college properties configured; first sync pending.
-- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; downloaded grid available for local reproduction.
+- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; corrected the beyond-values merge and non-class S.No. rows, added scrubbed real fixture. Corrected endpoint deployed. Entire local download passed offline (160 items, 83 dates), 173 tests passed. Await first hosted sync.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -56,7 +57,7 @@ Downloaded grid available locally; no user action until corrected endpoint is ve
 | T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | WAITING ON USER |
 | T2.3a | Atomic snapshot, class reconciliation and change-alert queue migration | §4, §14 | DONE |
 | T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | DONE |
-| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | IN PROGRESS |
+| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | WAITING ON USER |
 | T2.4 | Classes on Today and the timeline; attendance prompt (Attended/Missed/Medical/Cancelled); cancelled classes struck through with Restore (manual) and auto-restore when the sheet re-lists them; move and add-extra-class overrides | §4 Class handling, Cancelled classes, Manual changes | TODO |
 
 ## Phase 3: Reminder engine and check-ins (PRD §6)
@@ -151,4 +152,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 23:06 · Codex · T2.1 done · T2.2 implementation passed offline checks; waiting for college-account setup.
 - 2026-11-26 23:28 · Codex · T2.3a–b done and deployed · waiting for first college sync (T2.3c).
 - 2026-11-27 00:12 · Codex · T2.3c diagnosis · waiting for the rejected grid from the private college sheet.
-- 2026-11-27 00:20 · Codex · T2.3c resumed · reproducing downloaded grid.
+- 2026-11-27 00:20 · Codex · T2.3c fix deployed · waiting for college rerun and trigger installation.

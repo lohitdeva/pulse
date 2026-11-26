@@ -219,9 +219,15 @@ export function parseSectionCTimetable(payload: TimetableBridgePayload): ParsedT
   for (let rowIndex = headerRowIndex + 1; rowIndex < payload.values.length; rowIndex += 1) {
     const row = payload.values[rowIndex] ?? [];
     const dateValue = row[dateColumn] ?? "";
-    if (dateValue.trim()) activeDate = parseSheetDate(dateValue);
-
     const section = normalizeText(row[sectionColumn] ?? "").toUpperCase();
+    if (dateValue.trim()) {
+      if (!/^\d{1,2}-[A-Za-z]{3}$/.test(dateValue.trim())) {
+        if (section) throw new Error(`Invalid timetable date: ${dateValue}`);
+        activeDate = undefined;
+        continue;
+      }
+      activeDate = parseSheetDate(dateValue);
+    }
     if (!/^(?:SECTION\s+)?C$/.test(section) || !activeDate) continue;
 
     const seenMerges = new Set<string>();
