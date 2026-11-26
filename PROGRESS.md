@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** (user OK pending) push `20261127010000_reminders.sql` + deploy `dispatch-reminders`; then T3.3 (app push.ts must accept `pulse-reminder` payloads).
+**Next action:** T3.3 notification actions; then ONE user-approved deploy: reminders migration + dispatch-reminders + notification-action + git push (deploying dispatcher before T3.3 would show generic Android notifications).
 **Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
@@ -73,7 +73,7 @@ _(Nothing right now.)_
 | T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | DONE |
 | T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | DONE |
 | T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | DONE |
-| T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | TODO |
+| T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | IN PROGRESS |
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | TODO |
 | T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | TODO |
 | T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | TODO |
