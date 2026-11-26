@@ -2,22 +2,22 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T2.3c: run the first college sync against the corrected deployment and confirm triggers.
+**Next action:** T2.4a (classes on Today) and T3.1 (`shared/reminders.ts`) in parallel.
 **Current phase:** 2 — Timetable sync
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. Run `syncCollegeTimetable` once in the college Apps Script editor.
-2. After it completes successfully, run `installCollegeTimetableTriggers` once and confirm both runs completed. If sync fails, report the HTTP status.
+_(Nothing right now.)_
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
 ## Handoff notes
 
-- Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
-- T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 implementation passed offline checks; college properties configured; first sync pending.
-- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; corrected the beyond-values merge and non-class S.No. rows, added scrubbed real fixture. Corrected endpoint deployed. Entire local download passed offline (160 items, 83 dates), 173 tests passed. Await first hosted sync.
+- Phase 1 done (tag phase-1). Phase 2: T2.1–T2.3c DONE. First hosted college sync verified 2026-11-27 (read-only query): 1 snapshot @ 2026-11-26 19:05 UTC, 160 classes, 0 alerts; user ran `installCollegeTimetableTriggers` successfully.
+- Hosted reads: `npx -y supabase@latest db query --remote --read-only "<sql>"`. Hosted writes/migrations need the user's OK first.
+- T2.4 split into a/b/c; T3.2 and T3.4 split. Plan: T2.4a ∥ T3.1, then T2.4b → T2.4c → phase-2 gate, then T3.2a → T3.2b → T3.3 → T3.4a/b → T3.5.
+- Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -54,20 +54,24 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T2.1 | `shared/timetable/parser.ts`: raw grid + merged ranges → Section C classes; tests from `docs/reference/timetable-fixture.json` covering every §4 cell variant, plus a synthetic exam cell → Exam item | §4 | DONE |
-| T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | WAITING ON USER |
+| T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | DONE |
 | T2.3a | Atomic snapshot, class reconciliation and change-alert queue migration | §4, §14 | DONE |
 | T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | DONE |
-| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | WAITING ON USER |
-| T2.4 | Classes on Today and the timeline; attendance prompt (Attended/Missed/Medical/Cancelled); cancelled classes struck through with Restore (manual) and auto-restore when the sheet re-lists them; move and add-extra-class overrides | §4 Class handling, Cancelled classes, Manual changes | TODO |
+| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | DONE |
+| T2.4a | Classes on Today: fetch day's `classes` as `busy` into `buildDayPlan`, class items on Now/Next + timeline, unseen change alerts listed | §4 Class handling, Change alerts | TODO |
+| T2.4b | Class overrides migration + data layer: attendance (Attended/Missed/Medical/Cancelled), manual cancel/restore/move/extra; reconcile honours manual changes, auto-restore, sheet-wins-on-cell-change | §4 Cancelled classes, Manual changes | TODO |
+| T2.4c | Class UI: attendance prompt after class end, struck-through cancelled class with Restore, move / add-extra sheets | §4 | TODO |
 
 ## Phase 3: Reminder engine and check-ins (PRD §6)
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
 | T3.1 | `shared/reminders.ts`: levels, windows from facility hours (meal window also closes 10 min before the next class), cadence, quiet rules (class, 2–7 AM, call), firmer wording after 3 repeats, Missed transitions; simulated-day tests | §6 | TODO |
-| T3.2 | Tables `reminders`, `notification_log`, `missed_items`; `dispatch-reminders` function; pg_cron every minute | §6, §14 | TODO |
+| T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | TODO |
+| T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | TODO |
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | TODO |
-| T3.4 | Check-in sheets: morning, midday, night (including the unlogged-items sweep and missed reasons) | §6 Check-ins, §11 Missed log | TODO |
-| T3.5 | Morning digest push at 8:25 | §6 Morning digest | TODO |
+| T3.4a | Check-in sheets: morning and midday | §6 Check-ins | TODO |
+| T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | TODO |
+| T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | TODO |
 
 ## Phase 4: Tasks and deadlines (PRD §5)
 | ID | Ticket | PRD | Status |
@@ -153,3 +157,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 23:28 · Codex · T2.3a–b done and deployed · waiting for first college sync (T2.3c).
 - 2026-11-27 00:12 · Codex · T2.3c diagnosis · waiting for the rejected grid from the private college sheet.
 - 2026-11-27 00:20 · Codex · T2.3c fix deployed · waiting for college rerun and trigger installation.
+- 2026-11-27 · Claude Code · took over from Codex; T2.2 + T2.3c DONE (hosted sync verified) · starting T2.4a ∥ T3.1.
