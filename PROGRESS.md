@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Phase 0 COMPLETE — run the full-suite gate and tag `phase-0`. Then start Phase 1 **T1.2** (schedule tables + seed templates; T1.1 already DONE).
+**Next action:** T0.6 — wire `supabase/functions` into `pnpm -r test` (and typecheck/lint where feasible) so function bugs are caught in the standard suite. Then Phase 1 **T1.2** (schedule tables + seed templates; T1.1 already DONE).
 **Current phase:** 0
 
 ## Needs you
@@ -19,7 +19,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 ## Handoff notes
 _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
 
-- **Last tool:** Claude Code (planner). **PHASE 0 COMPLETE (26 Nov)** — T0.1a–T0.5 all DONE; push verified end-to-end on the S23 (delivery + Done/Snooze recorded). Next: Phase 1 **T1.2** (T1.1 already DONE).
+- **Last tool:** Claude Code (planner). **PHASE 0 COMPLETE (26 Nov)** — T0.1a–T0.5 all DONE; push verified end-to-end on the S23 (delivery + Done/Snooze recorded); tagged `phase-0`. Now closing the CI-coverage gap as **T0.6** (the Edge Functions were not in `pnpm -r` typecheck/lint/test, which is why the T0.4e base64 bug shipped). Then Phase 1 **T1.2** (T1.1 already DONE).
 - **T1.1 DONE (committed):** `shared/time.ts` + `shared/time.test.ts`; `shared/index.ts` re-exports. Fixed +5:30 IST offset (no deps, no I/O, portable to Deno Edge Functions). API: `istParts`, `pulseDayKey`, `startOfPulseDay`, `pulseDayRange` (half-open), `currentPulseDayKey`, `blockInstants`, consts `IST_TZ`/`IST_OFFSET_MINUTES`/`DAY_BOUNDARY_HOUR`. Checker PASS (all stages exit 0; shared 20 tests incl. fake-clock, app 12). `IST_TZ` currently unused (harmless).
 - **T0.4d DONE earlier this session:** SW precache dedupe (`cache.addAll([...precacheUrls])`) + dark manifest `#0b0e14`. Root cause was duplicate precache URLs → `addAll` rejects. **User-gated:** deploy the new build, then run the S23 push test (Needs you). T0.5 device acceptance still WAITING ON USER.
 - **GitHub + deploy status (26 Nov):** remote `origin` → github.com/lohitdeva/pulse set; `main` pushed by user. **T0.4d fix is now DEPLOYED and VERIFIED LIVE** — in-browser on pulse-tau-liard: sw.js 4794 B, install uses `addAll([...])`, the SW registers and ACTIVATES, `serviceWorker.ready` resolves (previously went redundant). Remaining: the S23 functional push test (enroll + test notification + Done/Snooze) — user step. Keeping the `.codex`/`.claude`/`*.md` tooling tracked for now (user will remove when the project is done).
@@ -41,6 +41,7 @@ _(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can 
 | T0.4d | Restore production worker activation | §14 Push | DONE |
 | T0.4e | Web Push 502 on Supabase Edge Runtime: polyfill `Uint8Array.fromBase64`/`toBase64` (Deno 2.1.4 lacks them; `@daaku/webpush` needs them) | §14 Push | DONE |
 | T0.5 | Vercel deploy, manifest with placeholder icons, installable on the S23; user tests push on the phone | §14, §15 P0 | DONE |
+| T0.6 | Cover `supabase/functions` in the workspace quality gates (wire its Vitest tests into `pnpm -r test`; typecheck/lint where feasible) — the gap that let T0.4e ship | §14 | IN PROGRESS |
 
 ## Phase 1: Schedule core (PRD §3, §4, §5, §6)
 | ID | Ticket | PRD | Status |
