@@ -13,6 +13,17 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 3. Close and reopen Pulse to load the enrollment fix. Under Notifications, tap **Enable push on this device** and allow notifications. Tap **Send test notification** and tap **Done** on the Android notification.
 4. Send a second test and tap **Snooze 10 min**. Expand the notification if the buttons are collapsed. Tell the planner the outcome for each button or the exact error so it can check the backend receipts.
 
+## Handoff notes
+_(Rewritten at every checkpoint, 10 lines or fewer, so Codex or Claude Code can pick up cold. See AGENTS.md "Handoff between tools".)_
+
+- **Last tool:** Codex. It stopped on a usage limit right after the `chore: start T0.4d` checkpoint. The tree was clean.
+- **Current ticket:** T0.4d. The production service worker never activates on the hosted site, so `navigator.serviceWorker.ready` never resolves and the S23 can't enroll for push.
+- **Already tried (T0.4c):** bounded enrollment waits and preserved the permission gesture. Deployed, but the S23 retry is still pending.
+- **Lead (unverified, from a review on 26 Nov):** the install handler in `app/src/sw.ts` runs `cache.addAll()` over the whole precache manifest. One failed URL fails the install, so the worker never activates. Confirm in a real browser (DevTools → Application → Service Workers, console) before changing code.
+- **Option for the user:** park T0.4d and start Phase 1. Push isn't needed until Phase 3. Ask under Needs you if T0.4d needs another follow-up ticket.
+- **Small fix noted:** the manifest `theme_color` and `background_color` are light (#f7f7f5), but the app is dark (#0b0e14).
+- **After T0.4d:** T0.5. The user's S23 test steps are under Needs you.
+
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
 |---|---|---|---|
@@ -112,7 +123,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 | T10.4 | Playwright smoke tests; 3-day simulated run; Lighthouse installable check | §15 v1 is done when | TODO |
 
 ## Session log
-_(One line per session: date, phase, tickets done, where it stopped.)_
+_(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done · where it stopped`.)_
 
 - 2026-11-26 — Phase 0: T0.1a, T0.1b and T0.2 verified and committed. T0.3 waiting for Supabase project setup.
 - 2026-11-26 — T0.3 verified and committed. Hosted migration matches local history, email confirmed, subsequent sign-in recorded, public sign-ups disabled. Local callback uses port 5173.
@@ -120,3 +131,4 @@ _(One line per session: date, phase, tickets done, where it stopped.)_
 - 2026-11-26 — T0.2a corrected gallery typography, chip and row proportions. Verified at 360, 390 and 1280 px, including sheet dismissal, focus return and tab selection.
 - 2026-11-26 — T0.4a/b passed, backend and PWA deployed. T0.5 software checks passed. Production routes, bundled public keys, worker, manifest and icons verified via HTTP. S23 install, sign-in, delivery and action receipts pending.
 - 2026-11-26 — T0.4c fixed unbounded enrollment waits and preserved the permission gesture. Verified updated production bundle and worker. S23 retry pending; no subscription existed at diagnosis.
+- 2026-11-26 11:05 · Claude (chat) · no tickets · Added CLAUDE.md, `.claude/agents/` and shared handoff rules so Codex and Claude Code can alternate. Next session continues T0.4d or parks it.

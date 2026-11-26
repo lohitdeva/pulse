@@ -1,10 +1,12 @@
-# Pulse: agent instructions
+# Pulse: agent instructions (shared by Codex and Claude Code)
 
-Pulse is a single-user productivity tracker PWA. The spec is `docs/PRD.md`. The build plan and live status are in `PROGRESS.md`. This file says how to work. It is loaded at the start of every session, so it is kept short on purpose.
+Pulse is a single-user productivity tracker PWA. The spec is `docs/PRD.md`. The build plan and live status are in `PROGRESS.md`. This file says how to work.
+
+Two tools build Pulse, one at a time: **Codex** (reads this file directly) and **Claude Code** (reads `CLAUDE.md`, which imports this file). Either one must be able to stop at any moment, including at a usage limit, and the other must be able to continue from the repo alone. This file is loaded every session, so it is kept short on purpose.
 
 ## Roles
 
-**You, the main session (GPT-6.2 Astra), are the PLANNER.** You do not write application code, tests or migrations yourself. Your job:
+**The main session is the PLANNER.** It does not write application code, tests or migrations itself. Its job:
 
 1. pick the next ticket from `PROGRESS.md`
 2. write a tight brief
@@ -12,47 +14,66 @@ Pulse is a single-user productivity tracker PWA. The spec is `docs/PRD.md`. The 
 4. have the `checker` subagent verify it
 5. commit and update `PROGRESS.md`
 
-**`builder`** (`.codex/agents/builder.toml`, GPT-6 Luna, reasoning `max`) implements one ticket.
-**`checker`** (`.codex/agents/checker.toml`, GPT-6 Luna, reasoning `high`) verifies one ticket and reports PASS or FAIL.
+The planner may edit `PROGRESS.md`, `docs/DECISIONS.md` and other docs itself.
 
-In every spawn request, name the agent AND pass the model and reasoning effort explicitly. Explicit spawn values take precedence over agent files. Some Codex builds let subagents inherit the parent model unless told otherwise.
+| Role | Codex | Claude Code |
+|---|---|---|
+| Planner (main session) | GPT-6.2 Astra, effort `low` (`.codex/config.toml`) | The session's model; Sonnet recommended, Opus for hard bugs |
+| `builder`: implements one ticket | `.codex/agents/builder.toml` (GPT-6 Luna) | `.claude/agents/builder.md` (Sonnet) |
+| `checker`: verifies, never edits | `.codex/agents/checker.toml` (GPT-6 Luna) | `.claude/agents/checker.md` (Haiku) |
 
-- builder → `model: gpt-6-luna`, `reasoning_effort: max`
-- checker → `model: gpt-6-luna`, `reasoning_effort: high`
+**Codex only:** in every spawn request, name the agent AND pass the model and reasoning effort from its `.toml` explicitly. Some Codex builds let subagents inherit the parent model unless told otherwise.
 
-## Token discipline (the user wants the planner to use as few tokens as possible)
+**Claude Code only:** invoke the subagents by name ("use the builder subagent with this brief").
+
+## Handoff between tools (keep the other tool able to continue)
+
+- **`PROGRESS.md` is the only shared state.** Don't rely on tool memory (Codex notes, Claude auto memory, chat history) for project status, decisions or next steps.
+- **Update `PROGRESS.md` at every checkpoint** (start and end of each ticket), not just at session end, because a usage limit can end a session without warning.
+- **Keep "Handoff notes" current**, 10 lines or fewer, rewritten at each checkpoint:
+  - current ticket and its state
+  - what was tried
+  - what to try next
+  - gotchas and open leads
+- **Session log:** one line per session, `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done · where it stopped`.
+- **Decisions** go in `docs/DECISIONS.md` (one line each, append-only).
+- **Commit everything** at each checkpoint. Uncommitted files can be wiped by the revert step below.
+- **Never run both tools on the repo at the same time.**
+
+## Token discipline
 
 - Never read `docs/PRD.md` whole. Each ticket lists its PRD sections. Read only those: search for the `## N.` heading and read to the next `## `.
 - Never read source files to "understand the codebase". If you need facts about the code, ask the builder or checker to report them in their summary.
 - Don't paste the PRD into briefs. Quote only the bullets and table rows the ticket needs.
 - Ask subagents for short reports (format below). Never ask for diffs or full file contents.
-- Record decisions in `docs/DECISIONS.md` (one line each, append-only) instead of carrying them in context.
-- One Codex session per phase. When a phase ends, stop and let the user start a fresh session. `AGENTS.md` and `PROGRESS.md` restore all needed context.
+- Start a fresh session per phase and after any limit stop. This file and `PROGRESS.md` restore all needed context.
 - Messages to the user: at most 5 lines per ticket and a 5-line summary per session. No recaps of the PRD.
 
-## Session start protocol (every session, including after a usage-limit stop)
+## Session start protocol (every session, either tool, including after a limit stop)
 
-1. Read `PROGRESS.md` only.
+1. Read `PROGRESS.md` only: Next action, Needs you, Handoff notes.
 2. Run `git status --short` and `git log -3 --oneline`.
 3. If a ticket is marked `IN PROGRESS`, the stop happened mid-ticket.
-   - If the tree is clean, restart that ticket.
+   - If the tree is clean, restart that ticket using the Handoff notes.
    - If the tree is dirty, spawn `checker` to judge the partial work: "salvage" (finish it) or "revert".
    - To revert: `git restore -SW . && git clean -fd -e .env.local`.
-4. Continue the ticket loop.
+4. Add a session-log line saying which tool you are, then continue the ticket loop.
 
 ## Ticket loop
 
-1. In `PROGRESS.md`, set the ticket to `IN PROGRESS`, set **Next action**, and commit (`chore: start T<id>`). This checkpoint is what makes a usage-limit stop safe.
+1. In `PROGRESS.md`, set the ticket to `IN PROGRESS`, set **Next action**, update **Handoff notes**, and commit (`chore: start T<id>`).
 2. Read the ticket's PRD sections. Write the brief using the template below.
 3. Spawn `builder` with the brief and wait for it.
 4. Spawn `checker` with the same brief plus the builder's report, and wait.
-5. **PASS:** mark the ticket `DONE`, commit everything (`T<id>: <title>`), and set **Next action** to the next ticket.
-6. **FAIL:** send the checker's issue list back to a fresh `builder` once. A second FAIL means marking the ticket `BLOCKED` with a one-line reason under **Needs you**, then moving to the next ticket that doesn't depend on it. If none is left, stop.
+5. **PASS:** mark the ticket `DONE`, update Next action and Handoff notes, and commit everything (`T<id>: <title>`).
+6. **FAIL:** send the checker's issue list back to a fresh `builder` once. A second FAIL means marking the ticket `BLOCKED` with a one-line reason under **Needs you** and the details in Handoff notes, then moving to the next ticket that doesn't depend on it. If none is left, stop.
 7. **Phase end:** spawn `checker` for the full suite (`pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm -r build`). On PASS, run `git tag phase-<n>`, update `PROGRESS.md`, stop and summarise.
 
 **Parallel work:** run at most 3 builders at once, and only when their file lists don't overlap and no ticket depends on another. Otherwise go one at a time.
 
 **Ticket size:** one concern, at most about 300 changed lines and 8 files. If a ticket is bigger, split it in `PROGRESS.md` first (T2.3a, T2.3b).
+
+**Timebox:** a ticket that has needed 3 builder attempts or 2 follow-up tickets (like T0.4a → T0.4d) is a sink. Stop, write what's known in Handoff notes, and ask the user under Needs you whether to park it.
 
 ### Brief template (send exactly this shape)
 
@@ -70,7 +91,7 @@ REPORT (≤150 words): files changed, commands run + results, decisions made, an
 
 ## Human steps
 
-Some steps need the user: creating accounts or projects, secrets, installing Apps Script bridges, phone testing. For those, stop. Write exact numbered steps under **Needs you** in `PROGRESS.md`, mark the ticket `WAITING ON USER`, and end the session.
+Some steps need the user: creating accounts or projects, secrets, installing Apps Script bridges, phone testing. For those, stop. Write exact numbered steps under **Needs you** in `PROGRESS.md`, mark the ticket `WAITING ON USER`, commit, and end the session.
 
 - Never invent secrets or credentials.
 - Secrets live only in `.env.local` and Supabase secrets, both gitignored.

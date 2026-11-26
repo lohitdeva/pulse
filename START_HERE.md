@@ -6,10 +6,12 @@ This kit lets Codex build Pulse in small, resumable steps. GPT-6.2 Astra acts on
 
 | File | Purpose |
 |---|---|
-| `AGENTS.md` | Rules Codex loads every session: planner role, token discipline, ticket loop, resume protocol |
+| `AGENTS.md` | Shared rules for Codex and Claude Code: planner role, handoff, token discipline, ticket loop, resume protocol |
 | `.codex/config.toml` | Main session: GPT-6.2 Astra at low effort. Subagents: GPT-6 Luna at max. At most 3 in parallel |
 | `.codex/agents/builder.toml` | Luna, max effort: implements one ticket |
 | `.codex/agents/checker.toml` | Luna, high effort: verifies each ticket, never edits |
+| `CLAUDE.md` | Claude Code entry point: imports AGENTS.md and adds Claude-specific notes |
+| `.claude/agents/builder.md` / `checker.md` | Claude Code builder (Sonnet, high effort) and checker (Haiku, read-only) |
 | `PROGRESS.md` | 49 tickets in 11 phases, with status, "Next action", "Needs you" and a session log |
 | `docs/PRD.md` | The full spec (markdown export of the PRD doc) |
 | `docs/reference/` | Timetable screenshot, parser test fixture, UI reference image |
@@ -70,6 +72,28 @@ The planner pauses at each of these and writes exact instructions under "Needs y
 | 7 | Create a free Strava API app and connect your account |
 | 9 | Check that the digest email arrives, then set up the ChatGPT task (PRD appendix) |
 | 10 | Approve the generated images |
+
+## Switching between Codex and Claude Code
+
+Both tools follow the same rules (`AGENTS.md`) and keep the same progress file (`PROGRESS.md`). Each one saves a checkpoint at the start and end of every ticket and rewrites the "Handoff notes", so whenever one runs out of usage, the other can continue.
+
+**To switch:** close the current session first. Never run both on the repo at once. Then open the other tool in this folder and paste:
+
+```
+Pick up Pulse where the last session left off. Follow the session start protocol in AGENTS.md: read PROGRESS.md (Next action, Needs you, Handoff notes), check git, then continue the ticket loop with the builder and checker subagents. Keep PROGRESS.md and the Handoff notes updated at every checkpoint. Stop at phase end, when something needs me, or when blocked; summary in 5 lines or fewer.
+```
+
+The same prompt works in both tools.
+
+**Claude Code tips**
+
+- Open the folder with `cd ~/Desktop/pulse-kit && claude`. Run `/context` to check that `CLAUDE.md` (with `AGENTS.md` inside it) loaded.
+- Use `/model` to pick Sonnet for normal planning, and Opus for hard bugs like T0.4d.
+- Run `/usage` to see your limits. If you hit a session limit with the session still open, Claude Code can wait and continue after the reset.
+
+**Codex tips**
+
+- Codex reads `AGENTS.md` directly. To save usage, consider lowering the builder in `.codex/agents/builder.toml` from `max` to `high`, which is OpenAI's suggested starting effort for Luna.
 
 ## Usage notes
 
