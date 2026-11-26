@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Wire signed-in Plan tab, verify CRUD flow, then perform phase acceptance.
+**Next action:** T1.6c Plan integration and T1.7 acceptance regression in progress.
 **Current phase:** 1
 
 ## Needs you
@@ -15,7 +15,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 ## Handoff notes
 
 - T1.6a and T1.6b passed; both hosted migrations are current.
-- Wire signed-in Plan tab, verify CRUD flow, then perform phase acceptance.
+- T1.6c Plan integration and T1.7 acceptance regression in progress.
 - Main auto-deploys to production. Apply pending hosted migrations before push.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -47,6 +47,7 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete component | §5 Task fields | DONE |
 | T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | IN PROGRESS |
+| T1.7 | Phase acceptance regression: fake-clock Now/Next across midnight and 4 AM rollover | §15 Phase 1 | IN PROGRESS |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
 | ID | Ticket | PRD | Status |
