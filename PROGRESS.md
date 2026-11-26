@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Build habit timeline controls and verify T1.5c.
+**Next action:** Build T1.5c timeline controls and T1.6b task editor in separate files. Then connect the editor in T1.6c.
 **Current phase:** 1
 
 ## Needs you
@@ -15,8 +15,8 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 ## Handoff notes
 
 - T1.5b and T1.6a verified and committed; hosted migrations current.
-- Build habit timeline controls and verify T1.5c.
-- Main auto-deploys to production. Apply pending hosted migrations before push.
+- Build T1.5c timeline controls and T1.6b task editor in separate files. Then connect the editor in T1.6c.
+- Main auto-deploys to production. Hosted migrations are current.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -45,7 +45,8 @@ No user step pending. Both logging and tasks migrations were verified in the hos
 | T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | DONE |
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | IN PROGRESS |
 | T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
-| T1.6b | Manual task list, quick add, edit and delete in the signed-in app | §5 Task fields | TODO |
+| T1.6b | Manual task list, quick add, edit and delete component | §5 Task fields | IN PROGRESS |
+| T1.6c | Connect manual tasks to the signed-in Plan tab and verify the user flow | §5 Task fields | TODO |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
 | ID | Ticket | PRD | Status |
