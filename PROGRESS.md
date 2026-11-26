@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T1.1–T1.4 + T1.5a DONE. T1.5b split (size) → **T1.5b** (water + meals cards + `useDayLogs` read model + aggregation) and **T1.5c** (habit checklist). **T1.5b IN PROGRESS** — builder implementing water/meals logging through the queue. Then T1.5c, then T1.6. **Before any of these UIs deploy**, apply the logging migration to hosted (`db push --remote` — see Needs you).
+**Next action:** Finish T1.5b verification and T1.5c, then integrate T1.6b on Plan.
 **Current phase:** 1
 
 ## Needs you
@@ -16,10 +16,9 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 
 ## Handoff notes
 
-- Codex is verifying T1.5b retry consistency after the checker found water duplicates on lost acknowledgments. T1.6a storage can proceed independently.
-- T1.1–T1.5a have completion commits. T1.5c follows the logging cards, then T1.6 and the full phase gate.
-- Production auto-deploys from main. Hosted logging and any task migrations must be applied before push.
-- Leave the local untracked Claude launch configuration outside commits.
+- Manual task storage passed independent review. Hosted logging and task migrations are pending.
+- Finish T1.5b verification and T1.5c, then integrate T1.6b on Plan.
+- Main auto-deploys to production. Apply pending hosted migrations before push.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -47,7 +46,7 @@ _No blocking user step right now._ Phase 0 acceptance and T1.2 (migration applie
 | T1.5a | Logging tables (`item_logs`, `meal_logs`, `water_logs`, RLS) + Dexie offline queue + sync engine wired to the Today sync dot; unit tests | §13 Interaction (offline-first) | DONE (hosted apply pending — before T1.5b) |
 | T1.5b | Water (+½/+1, gym separate vs 2 L target) + meals (Mess/Outside/Ordered in) logging cards through the queue; `useDayLogs` read model; shared aggregation + tests | §9 Water, §10 Meal link | IN PROGRESS |
 | T1.5c | Habit checklist — mark habit timeline items done/skipped through the queue (reuses `useDayLogs`) | §6 | TODO |
-| T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | IN PROGRESS |
+| T1.6a | Manual tasks storage, RLS, types and basic CRUD data functions | §5 Task fields | DONE |
 | T1.6b | Manual task list, quick add, edit and delete in the signed-in app | §5 Task fields | TODO |
 
 ## Phase 2: Timetable sync (PRD §4 Live timetable sync)
