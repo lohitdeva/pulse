@@ -8,3 +8,4 @@ Append-only, one line per decision: `YYYY-MM-DD · T<id> · decision · why`.
 - 2026-11-26 · PRD · Strava data never sent to AI services · Strava API agreement
 - 2026-11-26 · PRD · Smoking habits shown as "Habit A" / "Habit B" · privacy
 - 2026-11-26 · T0.4d · SW precache install deduplicates URLs before `cache.addAll` · VitePWA injected the manifest icons + webmanifest and the glob re-captured them, so 3 URLs were duplicated; `addAll` rejects duplicate requests, so the worker never activated
+- 2026-11-26 · T0.3 · Auth magic-link emails via free custom SMTP (Brevo/Resend free tier), not Supabase's built-in email · the built-in service rate-limits magic links to a few/hour, blocking sign-in; a free SMTP tier keeps the ₹0 budget
