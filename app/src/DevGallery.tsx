@@ -4,6 +4,7 @@ import {
   waterTotals,
   WEEKDAY_TEMPLATE,
   type MealLogRow,
+  type ItemLogStatus,
   type WaterLogRow,
 } from "@pulse/shared";
 import { useState, type ReactNode } from "react";
@@ -59,6 +60,9 @@ export function DevGallery() {
   const [activeTab, setActiveTab] = useState<TabName>("Today");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [habitStatuses, setHabitStatuses] = useState<Record<string, ItemLogStatus>>({
+    "habit:2026-11-26:2": "done",
+  });
 
   return (
     <main className="gallery-shell">
@@ -78,6 +82,10 @@ export function DevGallery() {
             greeting="Good evening, Sam"
             dateLabel="Thu, 26 Nov"
             onOpenSettings={() => undefined}
+            habitStatuses={habitStatuses}
+            onHabitStatusChange={(itemKey, status) =>
+              setHabitStatuses((current) => ({ ...current, [itemKey]: status }))
+            }
             logging={
               <>
                 <WaterCard totals={waterTotals(SAMPLE_WATER)} onAdd={() => undefined} />

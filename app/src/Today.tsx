@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { istParts, nowNext, type DayPlan, type ScheduleItem } from "@pulse/shared";
+import {
+  istParts,
+  nowNext,
+  type DayPlan,
+  type ItemLogStatus,
+  type ScheduleItem,
+} from "@pulse/shared";
 import { Card, IconChip, RingGauge } from "./ui";
 
 export interface TodayProps {
@@ -11,6 +17,8 @@ export interface TodayProps {
   onOpenSettings: () => void;
   onItemDone?: (item: ScheduleItem) => void;
   onStartTimer?: (item: ScheduleItem) => void;
+  habitStatuses?: Record<string, ItemLogStatus>;
+  onHabitStatusChange?: (itemKey: string, status: "done" | "skipped") => void;
   logging?: ReactNode;
 }
 
@@ -60,6 +68,34 @@ function timeRange(item: ScheduleItem): string {
   return "";
 }
 
+/** Stable identity for a loggable habit item within one Pulse day. */
+export function habitItemKey(dayKey: string, item: ScheduleItem): string | null {
+  if (
+    item.blockType !== "habit" &&
+    item.blockType !== "habit_checklist" &&
+    item.blockType !== "habit_nudge"
+  ) {
+    return null;
+  }
+  if (item.templateBlockSortOrder !== null) {
+    return `habit:${dayKey}:${item.templateBlockSortOrder}`;
+  }
+
+  if (item.meta.newsReading === true) {
+    const sources = item.meta.sources;
+    if (sources && typeof sources === "object") {
+      const sourceIdentity = Object.entries(sources as Record<string, unknown>)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([source, minutes]) => `${source}-${String(minutes)}`)
+        .join("+");
+      if (sourceIdentity) {
+        return `habit:${dayKey}:news:${sourceIdentity}`;
+      }
+    }
+  }
+  return null;
+}
+
 function GearIcon(): ReactNode {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -78,6 +114,8 @@ export function Today({
   onOpenSettings,
   onItemDone,
   onStartTimer,
+  habitStatuses = {},
+  onHabitStatusChange,
   logging,
 }: TodayProps) {
   const { current, next, fraction } = nowNext(plan, now);
@@ -175,6 +213,11 @@ export function Today({
             const isCurrent = item === current;
             const state = isCurrent ? "current" : end <= nowMs ? "past" : "future";
             const minutes = typeof item.meta.minutes === "number" ? item.meta.minutes : null;
+            const itemKey = habitItemKey(plan.dayKey, item);
+            const habitStatus = itemKey ? habitStatuses[itemKey] : undefined;
+            const habitLabel = `${itemTitle(item)}${
+              timeRange(item) ? ` at ${timeRange(item)}` : ""
+            }`;
             return (
               <li
                 key={item.sortOrder}
@@ -191,6 +234,51 @@ export function Today({
                     <span className="timeline-sub">{minutes} min</span>
                   ) : item.startAt && item.endAt ? (
                     <span className="timeline-sub">{timeRange(item)}</span>
+                  ) : null}
+                  {itemKey && onHabitStatusChange ? (
+                    <div className="habit-logging">
+                      <div
+                        className="habit-actions"
+                        role="group"
+                        aria-label={`Log ${habitLabel}`}
+                      >
+                        <button
+                          className="button button-secondary habit-action"
+                          type="button"
+                          data-habit-action="done"
+                          data-habit-key={itemKey}
+                          aria-label={`Mark ${habitLabel} done`}
+                          aria-pressed={habitStatus === "done"}
+                          onClick={() => onHabitStatusChange(itemKey, "done")}
+                        >
+                          Done
+                        </button>
+                        <button
+                          className="button button-secondary habit-action"
+                          type="button"
+                          data-habit-action="skipped"
+                          data-habit-key={itemKey}
+                          aria-label={`Mark ${habitLabel} skipped`}
+                          aria-pressed={habitStatus === "skipped"}
+                          onClick={() => onHabitStatusChange(itemKey, "skipped")}
+                        >
+                          Skip
+                        </button>
+                      </div>
+                      {habitStatus ? (
+                        <span
+                          className={`habit-status habit-status-${habitStatus}`}
+                          role="status"
+                          aria-label={`Current status: ${habitStatus}`}
+                        >
+                          {habitStatus === "missed"
+                            ? "Missed"
+                            : habitStatus === "skipped"
+                              ? "Skipped"
+                              : "Done"}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </span>
               </li>

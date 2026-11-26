@@ -13,6 +13,13 @@ export interface MealLogRow {
   place: MealPlace;
 }
 
+export type ItemLogStatus = "done" | "skipped" | "missed";
+
+export interface ItemLogRow {
+  item_key: string;
+  status: ItemLogStatus;
+}
+
 /** 2 bottles = 2 L per day (gym water excluded). */
 export const WATER_TARGET_ML = 2000;
 export const BOTTLE_ML = 1000;
@@ -74,12 +81,13 @@ export function mealsSummary(logs: MealLogRow[]): {
 export interface DayLogRows {
   meals: MealLogRow[];
   water: WaterLogRow[];
+  items?: ItemLogRow[];
 }
 
 /**
  * Server snapshot merged with writes still waiting in the offline queue.
- * Water is append-only (server + pending). Meals are upserts: a pending meal
- * replaces the server row for that meal; the last pending entry wins.
+ * Water is append-only (server + pending). Meals and item logs are upserts:
+ * a pending choice replaces the server row for that key; the last pending entry wins.
  */
 export function reconcileDayLogs(
   server: DayLogRows,
@@ -107,7 +115,10 @@ export function reconcileDayLogs(
     water.push(row);
     if (row.id) seenIds.add(row.id);
   }
-  return { meals, water };
+  const itemsByKey = new Map<string, ItemLogRow>();
+  for (const row of server.items ?? []) itemsByKey.set(row.item_key, row);
+  for (const row of pending.items ?? []) itemsByKey.set(row.item_key, row);
+  return { meals, water, items: [...itemsByKey.values()] };
 }
 
 function legacyWaterKey(row: WaterLogRow): string | null {

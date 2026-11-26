@@ -6,6 +6,7 @@ import {
   mealsSummary,
   templateForDayKey,
   waterTotals,
+  type ItemLogStatus,
 } from "@pulse/shared";
 import {
   useEffect,
@@ -105,7 +106,15 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
     () => buildDayPlan(templateForDayKey(dayKey), dayKey),
     [dayKey],
   );
-  const { logs, addWater, setMeal } = useDayLogs(client, userId, dayKey);
+  const { logs, addWater, setMeal, setItemStatus } = useDayLogs(
+    client,
+    userId,
+    dayKey,
+  );
+  const habitStatuses = useMemo<Record<string, ItemLogStatus>>(
+    () => Object.fromEntries(logs.itemLogs.map((row) => [row.item_key, row.status])),
+    [logs.itemLogs],
+  );
 
   return (
     <main className="today-shell">
@@ -117,6 +126,8 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
           dateLabel={dateLabelFor(now)}
           syncPending={pending > 0}
           onOpenSettings={() => setSettingsOpen(true)}
+          habitStatuses={habitStatuses}
+          onHabitStatusChange={setItemStatus}
           logging={
             <>
               <WaterCard totals={waterTotals(logs.waterLogs)} onAdd={addWater} />

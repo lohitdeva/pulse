@@ -959,6 +959,55 @@ button.list-row:hover .list-row-value {
   background: var(--pulse-blue);
 }
 
+.habit-logging {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.habit-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.habit-action {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.75rem;
+}
+
+.habit-action[aria-pressed="true"] {
+  border-color: var(--pulse-blue);
+  background: color-mix(in srgb, var(--pulse-blue) 18%, var(--pulse-surface-raised));
+  color: var(--pulse-blue-light);
+}
+
+.habit-action[data-habit-action="skipped"][aria-pressed="true"] {
+  border-color: var(--pulse-orange);
+  background: color-mix(in srgb, var(--pulse-orange) 16%, var(--pulse-surface-raised));
+  color: #ffb277;
+}
+
+.habit-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.habit-status-done {
+  color: var(--pulse-green);
+}
+
+.habit-status-skipped {
+  color: var(--pulse-orange);
+}
+
+.habit-status-missed {
+  color: var(--pulse-red);
+}
+
 .coming-soon {
   place-items: center;
   padding: 96px 0;
