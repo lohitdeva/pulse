@@ -65,6 +65,43 @@ function parseDayKey(dayKey: string): { year: number; month: number; day: number
   return { year, month, day };
 }
 
+/** Convert an IST `datetime-local` value to a UTC ISO instant, regardless of device timezone. */
+export function istDateTimeLocalToUtc(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(
+    value,
+  );
+  if (!match) throw new Error("Invalid IST date-time");
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? 0);
+  const millisecond = Number((match[7] ?? "").padEnd(3, "0") || 0);
+  try {
+    parseDayKey(`${year}-${pad(month)}-${pad(day)}`);
+  } catch {
+    throw new Error("Invalid IST date-time");
+  }
+  if (hour > 23 || minute > 59 || second > 59) {
+    throw new Error("Invalid IST date-time");
+  }
+
+  const wallTime = new Date(0);
+  wallTime.setUTCFullYear(year, month - 1, day);
+  wallTime.setUTCHours(hour, minute, second, millisecond);
+  return new Date(wallTime.getTime() - IST_OFFSET_MS).toISOString();
+}
+
+/** Format a UTC instant for an IST `datetime-local` input, regardless of device timezone. */
+export function utcToIstDateTimeLocal(instant: Date | string): string {
+  const date = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid date");
+  const parts = istParts(date);
+  return `${formatKey(parts.year, parts.month, parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
 /** UTC instant of the given IST wall-clock time on calendar date `dayKey` + `addDays`. */
 function istInstant(dayKey: string, addDays: number, hour: number, minute: number): Date {
   const { year, month, day } = parseDayKey(dayKey);

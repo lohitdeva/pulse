@@ -3,9 +3,11 @@ import {
   blockInstants,
   currentPulseDayKey,
   istParts,
+  istDateTimeLocalToUtc,
   pulseDayKey,
   pulseDayRange,
   startOfPulseDay,
+  utcToIstDateTimeLocal,
 } from "./time";
 
 describe("istParts", () => {
@@ -18,6 +20,31 @@ describe("istParts", () => {
       minute: 0,
       second: 0,
     });
+  });
+});
+
+describe("IST datetime-local conversions", () => {
+  it("converts IST wall time to UTC without using device local time", () => {
+    expect(istDateTimeLocalToUtc("2026-11-27T00:00")).toBe(
+      "2026-11-26T18:30:00.000Z",
+    );
+  });
+
+  it("formats UTC instants as datetime-local values in IST", () => {
+    expect(utcToIstDateTimeLocal("2026-11-26T18:30:00.000Z")).toBe(
+      "2026-11-27T00:00",
+    );
+  });
+
+  it("round-trips datetime-local values and rejects invalid wall times", () => {
+    const local = "2026-11-30T23:45";
+    expect(utcToIstDateTimeLocal(istDateTimeLocalToUtc(local))).toBe(local);
+    expect(() => istDateTimeLocalToUtc("2026-02-30T08:00")).toThrow(
+      "Invalid IST date-time",
+    );
+    expect(() => istDateTimeLocalToUtc("2026-11-26T24:00")).toThrow(
+      "Invalid IST date-time",
+    );
   });
 });
 
