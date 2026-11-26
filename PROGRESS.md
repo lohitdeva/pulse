@@ -8,8 +8,7 @@ The planner keeps this file current: ticket status, next action, what needs the 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. In the college Apps Script editor, temporarily add this line immediately before `var requestOptions` in `syncCollegeTimetable`: `DriveApp.createFile('pulse-timetable-debug.json', JSON.stringify({values: values, merges: merges}), MimeType.PLAIN_TEXT); return;`
-2. Run once, download that private JSON from My Drive to Downloads, then remove the temporary line and save. Tell the planner the file is ready. Keep triggers off until the first successful sync.
+Downloaded grid available locally; no user action until corrected endpoint is verified.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
@@ -17,7 +16,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 
 - Phase 1 passed recursive typecheck, lint, 147 tests and build. Local Chrome verified signed-in task CRUD with synthetic auth/REST. Hosted logging and tasks migrations verified.
 - T2.1 passed all workspace gates (154 tests). Bridge contract is { values: string[][], merges: string[] } using A1 merge ranges. T2.2 implementation passed offline checks; college properties configured; first sync pending.
-- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; exact failing condition unknown until the live grid is available.
+- T2.3a passed checker and PGlite reconciliation checks. Migration applied on production. T2.3b deployed, owner binding set, browser GET verified HTTP 405. All gates passed (170 tests). First authenticated bridge attempt returned HTTP 400 before reconciliation. Endpoint intentionally gives one generic validation error; downloaded grid available for local reproduction.
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
 | ID | Ticket | PRD | Status |
@@ -57,7 +56,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 | T2.2 | `bridges/college.gs` + `bridges/README.md`: read the "Schedule" tab values and merges, POST with bearer secret; time triggers 5:30 AM and 12:30 PM; manual run (user installs) | §14 Bridges | WAITING ON USER |
 | T2.3a | Atomic snapshot, class reconciliation and change-alert queue migration | §4, §14 | DONE |
 | T2.3b | Authenticated ingest endpoint, validation, parser integration and deployment | §4, §14 | DONE |
-| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | WAITING ON USER |
+| T2.3c | Verify college sync, triggers and second fixture | §4, §14 | IN PROGRESS |
 | T2.4 | Classes on Today and the timeline; attendance prompt (Attended/Missed/Medical/Cancelled); cancelled classes struck through with Restore (manual) and auto-restore when the sheet re-lists them; move and add-extra-class overrides | §4 Class handling, Cancelled classes, Manual changes | TODO |
 
 ## Phase 3: Reminder engine and check-ins (PRD §6)
@@ -152,3 +151,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-26 23:06 · Codex · T2.1 done · T2.2 implementation passed offline checks; waiting for college-account setup.
 - 2026-11-26 23:28 · Codex · T2.3a–b done and deployed · waiting for first college sync (T2.3c).
 - 2026-11-27 00:12 · Codex · T2.3c diagnosis · waiting for the rejected grid from the private college sheet.
+- 2026-11-27 00:20 · Codex · T2.3c resumed · reproducing downloaded grid.
