@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { buildDayPlan, templateForDayKey } from "@pulse/shared";
+import { buildDayPlan, currentPulseDayKey, templateForDayKey } from "@pulse/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { offlineDb } from "./offline/db";
 
@@ -14,6 +14,12 @@ vi.mock("./offline/queue", () => queue);
 import {
   buildMiddayPayload,
   buildMorningPayload,
+  buildNightPayload,
+  markItemMissed,
+  MISSED_REASONS,
+  morningTimesToSave,
+  setMissedReason,
+  unloggedItems,
   defaultBedtime,
   defaultWakeTime,
   dueCheckIn,
@@ -60,12 +66,26 @@ describe("dueCheckIn", () => {
     expect(dueCheckIn(ist("14:00"), ["midday"])).toBeNull();
   });
 
-  it("is quiet around the 4 AM day boundary", () => {
-    expect(dueCheckIn(ist("00:30", "2026-11-28"), [])).toBeNull();
-    expect(dueCheckIn(ist("03:59", "2026-11-28"), [])).toBeNull();
-    // The new Pulse day starts with nothing done, but 04:00 is still before 08:00.
+  it("shows night from 22:30 to 03:59 IST, across midnight", () => {
+    expect(dueCheckIn(ist("22:29"), [])).toBeNull();
+    expect(dueCheckIn(ist("22:30"), [])).toBe("night");
+    expect(dueCheckIn(ist("23:59"), [])).toBe("night");
+    expect(dueCheckIn(ist("00:00", "2026-11-28"), [])).toBe("night");
+    expect(dueCheckIn(ist("00:30", "2026-11-28"), [])).toBe("night");
+    expect(dueCheckIn(ist("03:59", "2026-11-28"), [])).toBe("night");
+  });
+
+  it("drops the night card at the 4 AM day boundary", () => {
+    // 04:00 starts a new Pulse day with nothing done, but it is before morning's 08:00.
     expect(dueCheckIn(ist("04:00", "2026-11-28"), [])).toBeNull();
+    expect(dueCheckIn(ist("07:59", "2026-11-28"), [])).toBeNull();
     expect(dueCheckIn(ist("08:00", "2026-11-28"), [])).toBe("morning");
+  });
+
+  it("hides night once done for the Pulse day", () => {
+    expect(dueCheckIn(ist("23:00"), ["night"])).toBeNull();
+    expect(dueCheckIn(ist("00:30", "2026-11-28"), ["night"])).toBeNull();
+    expect(dueCheckIn(ist("23:00"), ["morning", "midday"])).toBe("night");
   });
 });
 
@@ -188,10 +208,11 @@ describe("planSummary", () => {
 });
 
 describe("readCheckInParam", () => {
-  it("accepts only morning or midday", () => {
+  it("accepts morning, midday or night", () => {
     expect(readCheckInParam("?checkin=morning")).toBe("morning");
     expect(readCheckInParam("?a=1&checkin=midday")).toBe("midday");
-    expect(readCheckInParam("?checkin=night")).toBeNull();
+    expect(readCheckInParam("?checkin=night")).toBe("night");
+    expect(readCheckInParam("?checkin=other")).toBeNull();
     expect(readCheckInParam("")).toBeNull();
   });
 });
@@ -275,5 +296,221 @@ describe("offline read model", () => {
       { kind: "morning", payload: { mood: 5 }, completed_at: "c" },
       { kind: "midday", payload: {}, completed_at: "b" },
     ]);
+  });
+});
+
+describe("morning defaults", () => {
+  const base = { bedtime: "01:00", wake: "07:00" };
+
+  it("saves neither default when the user touched nothing", () => {
+    const times = morningTimesToSave(DAY, { ...base, bedtimeTouched: false, wakeTouched: false });
+    expect(times).toEqual({ bedtime: undefined, wakeTime: undefined });
+    expect(buildMorningPayload({ ...times, mood: 3 })).toEqual({ mood: 3 });
+  });
+
+  it("saves only the times that were edited or confirmed", () => {
+    expect(
+      morningTimesToSave(DAY, { ...base, bedtimeTouched: true, wakeTouched: false }),
+    ).toEqual({ bedtime: "2026-11-26T19:30:00.000Z", wakeTime: undefined });
+    expect(
+      morningTimesToSave(DAY, { ...base, bedtimeTouched: false, wakeTouched: true }),
+    ).toEqual({ bedtime: undefined, wakeTime: "2026-11-27T01:30:00.000Z" });
+  });
+});
+
+describe("buildNightPayload", () => {
+  it("is empty when nothing was filled in", () => {
+    expect(buildNightPayload({})).toEqual({});
+    expect(buildNightPayload({ wentWell: "  ", mood: 9 })).toEqual({});
+  });
+
+  it("keeps trimmed reflection answers and a valid mood", () => {
+    expect(
+      buildNightPayload({ wentWell: " Gym ", didntGo: "", tomorrow: "Case prep", mood: 4 }),
+    ).toEqual({ reflection: { wentWell: "Gym", tomorrow: "Case prep" }, mood: 4 });
+  });
+});
+
+describe("unloggedItems", () => {
+  const cls = (id: string, start: string, end: string, cancelled = false) => ({
+    id,
+    kind: "class" as const,
+    title: `Class ${id}`,
+    startAt: ist(start),
+    endAt: ist(end),
+    course: "MKT",
+    room: null,
+    session: null,
+    professor: null,
+    cancelled,
+  });
+  const classes = [cls("c1", "10:00", "11:00"), cls("c2", "11:30", "12:30", true)];
+  const plan = buildDayPlan(templateForDayKey(DAY), DAY, [], classes);
+  const nothing = { itemLogs: [], mealLogs: [] };
+  const run = (
+    now: Date,
+    logs: Parameters<typeof unloggedItems>[2] = nothing,
+    reminders: Parameters<typeof unloggedItems>[3] = [],
+    missed: Parameters<typeof unloggedItems>[4] = [],
+  ) => unloggedItems(plan, classes, logs, reminders, missed, now);
+  const titles = (rows: ReturnType<typeof run>) => rows.map((r) => r.title);
+
+  it("lists only items that have already started, in time order", () => {
+    expect(run(ist("06:00"))).toEqual([]);
+    const midday = run(ist("14:00"));
+    expect(titles(midday)).toContain("Class c1");
+    expect(titles(midday).some((t) => /^Lunch/.test(t))).toBe(true);
+    const times = midday.map((r) => r.startAt.getTime());
+    expect(times).toEqual([...times].sort((a, b) => a - b));
+    const early = run(ist("10:30"));
+    expect(titles(early)).toContain("Class c1");
+    expect(titles(early).some((t) => /^Dinner/.test(t))).toBe(false);
+    expect(titles(run(ist("21:05"))).some((t) => /^Dinner/.test(t))).toBe(true);
+  });
+
+  it("keys items as Today and the dispatcher do", () => {
+    const rows = run(ist("22:00"));
+    const c1 = rows.find((r) => r.classId === "c1")!;
+    expect(c1).toMatchObject({ itemKey: "class:c1", kind: "class" });
+    const lunch = rows.find((r) => r.meal === "lunch")!;
+    expect(lunch.itemKey).toMatch(new RegExp(`^must:${DAY}:`));
+    const habit = rows.find((r) => r.kind === "habit")!;
+    expect(habit.itemKey).toMatch(new RegExp(`^habit:${DAY}:`));
+  });
+
+  it("leaves out cancelled classes and fillable timetable regions", () => {
+    const rows = run(ist("22:00"));
+    expect(titles(rows)).not.toContain("Class c2");
+    expect(titles(rows).some((t) => t.startsWith("Classes from the timetable"))).toBe(false);
+  });
+
+  it("leaves out items with an item log (done, skipped or missed)", () => {
+    const rows = run(ist("22:00"));
+    const habit = rows.find((r) => r.kind === "habit")!;
+    const must = rows.find((r) => r.kind === "must" && !r.meal)!;
+    const after = run(ist("22:00"), {
+      itemLogs: [{ item_key: habit.itemKey }, { item_key: must.itemKey }],
+      mealLogs: [],
+    });
+    expect(after.map((r) => r.itemKey)).not.toContain(habit.itemKey);
+    expect(after.map((r) => r.itemKey)).not.toContain(must.itemKey);
+    expect(after.length).toBe(rows.length - 2);
+  });
+
+  it("leaves out classes with attendance and meals with a meal log", () => {
+    const rows = run(ist("22:00"));
+    const after = run(ist("22:00"), {
+      itemLogs: [{ item_key: "class:c1" }],
+      mealLogs: [{ meal: "lunch", place: "mess" }],
+    });
+    expect(after.map((r) => r.itemKey)).not.toContain("class:c1");
+    expect(after.some((r) => r.meal === "lunch")).toBe(false);
+    expect(after.length).toBe(rows.length - 2);
+  });
+
+  it("leaves out items with a resolved reminder, but not an unresolved one", () => {
+    const rows = run(ist("22:00"));
+    const must = rows.find((r) => r.kind === "must" && !r.meal)!;
+    const resolved = run(ist("22:00"), nothing, [
+      { item_key: must.itemKey, resolution: "going_to_sleep" },
+      { item_key: "class:c1:attendance", resolution: "done" },
+    ]);
+    expect(resolved.map((r) => r.itemKey)).not.toContain(must.itemKey);
+    expect(resolved.map((r) => r.itemKey)).not.toContain("class:c1");
+    const open = run(ist("22:00"), nothing, [{ item_key: must.itemKey, resolution: null }]);
+    expect(open.map((r) => r.itemKey)).toContain(must.itemKey);
+  });
+
+  it("leaves out items already on the missed log for this day only", () => {
+    const rows = run(ist("22:00"));
+    const must = rows.find((r) => r.kind === "must" && !r.meal)!;
+    const today = run(ist("22:00"), nothing, [], [
+      { day_key: DAY, item_key: must.itemKey, title: must.title, reason: null },
+    ]);
+    expect(today.map((r) => r.itemKey)).not.toContain(must.itemKey);
+    const yesterday = run(ist("22:00"), nothing, [], [
+      { day_key: "2026-11-26", item_key: must.itemKey, title: must.title, reason: null },
+    ]);
+    expect(yesterday.map((r) => r.itemKey)).toContain(must.itemKey);
+  });
+});
+
+describe("missed reasons", () => {
+  it("offers the six one-tap reasons", () => {
+    expect(MISSED_REASONS.map((r) => r.label)).toEqual([
+      "Overslept",
+      "Busy / ran late",
+      "Not feeling well",
+      "Forgot",
+      "Chose to skip",
+      "Other",
+    ]);
+  });
+
+  it("queues a missed item_log with the reason in meta", async () => {
+    const client = {} as never;
+    await markItemMissed(USER, DAY, { itemKey: `must:${DAY}:5`, kind: "must" }, "forgot", client);
+    const mutation = (queue.enqueue.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(mutation).toMatchObject({
+      table: "item_logs",
+      op: "upsert",
+      onConflict: "user_id,day_key,item_key",
+      payload: {
+        user_id: USER,
+        day_key: DAY,
+        item_key: `must:${DAY}:5`,
+        status: "missed",
+        meta: { reason: "forgot" },
+      },
+    });
+    expect(queue.flushQueue).toHaveBeenCalledWith(client);
+  });
+
+  it("marks a missed class as attendance missed too", async () => {
+    await markItemMissed(USER, DAY, { itemKey: "class:c1", kind: "class" }, "busy", null);
+    const mutation = (queue.enqueue.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(mutation).toMatchObject({
+      payload: { item_key: "class:c1", status: "missed", meta: { attendance: "missed", reason: "busy" } },
+    });
+    expect(queue.flushQueue).not.toHaveBeenCalled();
+  });
+
+  it("updates only the reason columns of an existing missed_items row", async () => {
+    const eq3 = vi.fn(async () => ({ error: null }));
+    const eq2 = vi.fn(() => ({ eq: eq3 }));
+    const eq1 = vi.fn(() => ({ eq: eq2 }));
+    const update = vi.fn(() => ({ eq: eq1 }));
+    const from = vi.fn(() => ({ update }));
+    const ok = await setMissedReason(
+      { from } as never,
+      USER,
+      { day_key: DAY, item_key: "class:c1" },
+      "unwell",
+    );
+    expect(ok).toBe(true);
+    expect(from).toHaveBeenCalledWith("missed_items");
+    const patch = (update.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(Object.keys(patch).sort()).toEqual(["reason", "reason_at"]);
+    expect(patch.reason).toBe("unwell");
+    expect(eq1).toHaveBeenCalledWith("user_id", USER);
+    expect(eq2).toHaveBeenCalledWith("day_key", DAY);
+    expect(eq3).toHaveBeenCalledWith("item_key", "class:c1");
+  });
+
+  it("reports failure instead of throwing", async () => {
+    const eq3 = vi.fn(async () => ({ error: { message: "x" } }));
+    const client = { from: () => ({ update: () => ({ eq: () => ({ eq: () => ({ eq: eq3 }) }) }) }) };
+    expect(await setMissedReason(client as never, USER, { day_key: DAY, item_key: "a" }, "other")).toBe(false);
+  });
+});
+
+describe("night sweep day key", () => {
+  it("uses the previous Pulse day between 00:00 and 03:59 IST", () => {
+    expect(currentPulseDayKey(ist("00:30", "2026-11-28"))).toBe("2026-11-27");
+    expect(currentPulseDayKey(ist("03:59", "2026-11-28"))).toBe("2026-11-27");
+  });
+
+  it("rolls to the new day at 04:00 IST", () => {
+    expect(currentPulseDayKey(ist("04:00", "2026-11-28"))).toBe("2026-11-28");
   });
 });

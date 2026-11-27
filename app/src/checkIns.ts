@@ -7,10 +7,14 @@ import {
   blockInstants,
   type DayPlan,
   type ItemLogStatus,
+  type MealLogRow,
+  type MealName,
+  type PlanClass,
 } from "@pulse/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { offlineDb } from "./offline/db";
 import { enqueue, flushQueue, logItem, subscribe } from "./offline/queue";
+import { habitItemKey } from "./Today";
 
 export type CheckInKind = "morning" | "midday" | "night";
 
@@ -36,19 +40,20 @@ export interface MiddayInput {
 const MS_HOUR = 3_600_000;
 const MORNING_WINDOW: [number, number] = [8 * 60, 12 * 60];
 const MIDDAY_WINDOW: [number, number] = [13 * 60 + 30, 17 * 60];
+/** Night: 22:30-23:59 and 00:00-03:59 IST. After midnight it still belongs to the Pulse day that just ended. */
+const NIGHT_EVENING_START = 22 * 60 + 30;
+const NIGHT_EARLY_END = 4 * 60;
 
 function isKind(value: unknown): value is CheckInKind {
   return value === "morning" || value === "midday" || value === "night";
 }
 
 /**
- * Which check-in card Today should show: morning 08:00-12:00, midday 13:30-17:00 IST,
- * hidden once that kind is done. `done` is the kinds completed in the current Pulse day.
+ * Which check-in card Today should show: morning 08:00-12:00, midday 13:30-17:00,
+ * night 22:30-04:00 IST, hidden once that kind is done. `done` is the kinds completed in
+ * the current Pulse day (the 4:00 AM boundary means 00:00-03:59 is still the day that ended).
  */
-export function dueCheckIn(
-  now: Date,
-  done: Iterable<CheckInKind>,
-): "morning" | "midday" | null {
+export function dueCheckIn(now: Date, done: Iterable<CheckInKind>): CheckInKind | null {
   const finished = new Set(done);
   const p = istParts(now);
   const minutes = p.hour * 60 + p.minute;
@@ -65,6 +70,12 @@ export function dueCheckIn(
     minutes < MIDDAY_WINDOW[1]
   ) {
     return "midday";
+  }
+  if (
+    !finished.has("night") &&
+    (minutes >= NIGHT_EVENING_START || minutes < NIGHT_EARLY_END)
+  ) {
+    return "night";
   }
   return null;
 }
@@ -91,6 +102,44 @@ export function buildMorningPayload(input: MorningInput): Record<string, unknown
 
 export function buildMiddayPayload(input: MiddayInput): Record<string, unknown> {
   return validScale(input.mood) ? { mood: input.mood } : {};
+}
+
+export interface NightInput {
+  wentWell?: string | undefined;
+  didntGo?: string | undefined;
+  tomorrow?: string | undefined;
+  mood?: number | undefined;
+}
+
+const REFLECTION_MAX = 1000;
+
+/** `{reflection?: {wentWell?, didntGo?, tomorrow?}, mood?}`; blank answers are left out. */
+export function buildNightPayload(input: NightInput): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  const reflection: Record<string, string> = {};
+  for (const key of ["wentWell", "didntGo", "tomorrow"] as const) {
+    const text = input[key]?.trim().slice(0, REFLECTION_MAX);
+    if (text) reflection[key] = text;
+  }
+  if (Object.keys(reflection).length > 0) payload.reflection = reflection;
+  if (validScale(input.mood)) payload.mood = input.mood;
+  return payload;
+}
+
+/**
+ * Bedtime / wake instants to save from the morning form. A default the user never touched
+ * or confirmed is not data, so it is dropped.
+ */
+export function morningTimesToSave(
+  dayKey: string,
+  times: { bedtime: string; wake: string; bedtimeTouched: boolean; wakeTouched: boolean },
+): { bedtime: string | undefined; wakeTime: string | undefined } {
+  return {
+    bedtime: times.bedtimeTouched
+      ? timeInputToInstant(dayKey, times.bedtime, "bedtime")
+      : undefined,
+    wakeTime: times.wakeTouched ? timeInputToInstant(dayKey, times.wake, "wake") : undefined,
+  };
 }
 
 /** Default bedtime: 01:00 IST on the Pulse day's calendar date (the previous night's lights-out). */
@@ -197,10 +246,10 @@ export function planSummary(plan: DayPlan): PlanSummaryRow[] {
     }));
 }
 
-/** `?checkin=morning|midday` from a notification or link. */
-export function readCheckInParam(search: string): "morning" | "midday" | null {
+/** `?checkin=morning|midday|night` from a notification or link. */
+export function readCheckInParam(search: string): CheckInKind | null {
   const value = new URLSearchParams(search).get("checkin");
-  return value === "morning" || value === "midday" ? value : null;
+  return isKind(value) ? value : null;
 }
 
 function isOnline(): boolean {
@@ -251,6 +300,217 @@ export async function saveMiddayCheckIn(
   client: SupabaseClient | null = null,
 ): Promise<void> {
   await saveCheckIn(userId, dayKey, "midday", buildMiddayPayload(input), client);
+}
+
+export async function saveNightCheckIn(
+  userId: string,
+  dayKey: string,
+  input: NightInput,
+  client: SupabaseClient | null = null,
+): Promise<void> {
+  await saveCheckIn(userId, dayKey, "night", buildNightPayload(input), client);
+}
+
+// ------------------------------------------------------- night: unlogged sweep ---
+
+export const MISSED_REASONS = [
+  { value: "overslept", label: "Overslept" },
+  { value: "busy", label: "Busy / ran late" },
+  { value: "unwell", label: "Not feeling well" },
+  { value: "forgot", label: "Forgot" },
+  { value: "chose_to_skip", label: "Chose to skip" },
+  { value: "other", label: "Other" },
+] as const;
+
+export type MissedReason = (typeof MISSED_REASONS)[number]["value"];
+
+export interface UnloggedItem {
+  itemKey: string;
+  title: string;
+  kind: "must" | "habit" | "class";
+  startAt: Date;
+  /** Set for mess meals: Done goes through the meal logger, which needs a place. */
+  meal: MealName | null;
+  /** Set for classes. */
+  classId: string | null;
+}
+
+export interface SweepDayLogs {
+  itemLogs: ReadonlyArray<{ item_key: string }>;
+  mealLogs: ReadonlyArray<MealLogRow>;
+}
+
+/** A `reminders` row's resolution for one item. */
+export interface ReminderResolution {
+  item_key: string;
+  resolution: string | null;
+}
+
+/** A dispatcher-written `missed_items` row. */
+export interface MissedRow {
+  day_key: string;
+  item_key: string;
+  title: string;
+  reason: string | null;
+}
+
+function mealOfTitle(title: string): MealName | null {
+  const m = /^\s*(breakfast|lunch|snacks|dinner)\b/i.exec(title);
+  return m ? (m[1]!.toLowerCase() as MealName) : null;
+}
+
+/**
+ * Items of the plan's day that are must-do / habit / class, have already started, and
+ * have no log, attendance, reminder resolution or missed-log row: what the night
+ * check-in asks "done or missed?" about. Sorted by start time.
+ */
+export function unloggedItems(
+  plan: DayPlan,
+  classes: readonly PlanClass[],
+  dayLogs: SweepDayLogs,
+  reminders: readonly ReminderResolution[],
+  missed: readonly MissedRow[],
+  now: Date,
+): UnloggedItem[] {
+  const logged = new Set(dayLogs.itemLogs.map((l) => l.item_key));
+  const loggedMeals = new Set(dayLogs.mealLogs.map((m) => m.meal));
+  const resolved = new Set(
+    reminders.filter((r) => r.resolution).map((r) => r.item_key),
+  );
+  const missedKeys = new Set(
+    missed.filter((m) => m.day_key === plan.dayKey).map((m) => m.item_key),
+  );
+  const cancelled = new Set(classes.filter((c) => c.cancelled).map((c) => c.id));
+  const out: UnloggedItem[] = [];
+
+  for (const item of plan.items) {
+    if (!item.startAt || item.startAt.getTime() > now.getTime()) continue;
+    let itemKey: string | null;
+    let kind: UnloggedItem["kind"] = "must";
+    let meal: MealName | null = null;
+    let classId: string | null = null;
+    let title = item.title;
+
+    if (item.source === "class") {
+      classId = typeof item.meta.classId === "string" ? item.meta.classId : null;
+      if (!classId || item.meta.cancelled === true || cancelled.has(classId)) continue;
+      itemKey = `class:${classId}`;
+      kind = "class";
+      if (resolved.has(`${itemKey}:attendance`)) continue;
+    } else if (item.blockType === "must_do") {
+      if (item.meta.fillable === true || item.meta.newsReading === true) continue;
+      itemKey = `must:${plan.dayKey}:${item.templateBlockSortOrder ?? `s${item.sortOrder}`}`;
+      meal = mealOfTitle(item.title);
+      if (meal && loggedMeals.has(meal)) continue;
+    } else {
+      itemKey = habitItemKey(plan.dayKey, item);
+      kind = "habit";
+      if (item.meta.newsReading === true) title = "News reading";
+    }
+    if (!itemKey) continue;
+    if (logged.has(itemKey) || resolved.has(itemKey) || missedKeys.has(itemKey)) continue;
+    out.push({ itemKey, title, kind, startAt: item.startAt, meal, classId });
+  }
+  return out.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+}
+
+/** Queue a Missed log (with the reason) for an unlogged item. Classes also get `meta.attendance`. */
+export async function markItemMissed(
+  userId: string,
+  dayKey: string,
+  item: Pick<UnloggedItem, "itemKey" | "kind">,
+  reason: MissedReason,
+  client: SupabaseClient | null = null,
+): Promise<void> {
+  await enqueue({
+    table: "item_logs",
+    op: "upsert",
+    onConflict: "user_id,day_key,item_key",
+    payload: {
+      user_id: userId,
+      day_key: dayKey,
+      item_key: item.itemKey,
+      status: "missed",
+      logged_at: new Date().toISOString(),
+      meta: item.kind === "class" ? { attendance: "missed", reason } : { reason },
+    },
+  });
+  if (client && isOnline()) await flushQueue(client);
+}
+
+/**
+ * Reason for a dispatcher-marked Missed item. The signed-in role may only UPDATE
+ * `missed_items.reason / reason_at` (no insert, so it cannot go through the upsert-only
+ * offline queue); this is a direct write that reports failure to the caller.
+ */
+export async function setMissedReason(
+  client: SupabaseClient,
+  userId: string,
+  row: Pick<MissedRow, "day_key" | "item_key">,
+  reason: MissedReason,
+): Promise<boolean> {
+  try {
+    const { error } = await client
+      .from("missed_items")
+      .update({ reason, reason_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("day_key", row.day_key)
+      .eq("item_key", row.item_key);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolutions of today's reminders and reason-less missed items for today and yesterday. */
+export function useNightData(
+  client: SupabaseClient | null,
+  userId: string,
+  dayKey: string,
+  enabled: boolean,
+): { reminders: ReminderResolution[]; missed: MissedRow[]; refetch: () => void } {
+  const [data, setData] = useState<{ reminders: ReminderResolution[]; missed: MissedRow[] }>({
+    reminders: [],
+    missed: [],
+  });
+  const [tick, setTick] = useState(0);
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    if (!enabled || !client) return;
+    let active = true;
+    void (async () => {
+      try {
+        const [reminders, missed] = await Promise.all([
+          client
+            .from("reminders")
+            .select("item_key, resolution")
+            .eq("user_id", userId)
+            .eq("day_key", dayKey)
+            .not("resolution", "is", null),
+          client
+            .from("missed_items")
+            .select("day_key, item_key, title, reason")
+            .eq("user_id", userId)
+            .in("day_key", [previousDate(dayKey), dayKey])
+            .is("reason", null)
+            .order("missed_at", { ascending: true }),
+        ]);
+        if (!active || reminders.error || missed.error) return;
+        setData({
+          reminders: (reminders.data ?? []) as ReminderResolution[],
+          missed: (missed.data ?? []) as MissedRow[],
+        });
+      } catch {
+        // Offline: keep the last snapshot.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, userId, dayKey, enabled, tick]);
+
+  return { ...data, refetch };
 }
 
 /** Unsynced check-in writes for one user and day; later writes win per kind. */

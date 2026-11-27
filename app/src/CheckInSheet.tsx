@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DayPlan,
   ItemLogStatus,
+  MealLogRow,
   MealName,
   MealPlace,
+  PlanClass,
   mealsSummary,
   waterTotals,
 } from "@pulse/shared";
@@ -14,12 +16,24 @@ import {
   hygieneChanges,
   hygieneItems,
   instantToTimeInput,
+  markItemMissed,
+  MISSED_REASONS,
+  morningTimesToSave,
   planSummary,
   saveMiddayCheckIn,
   saveMorningCheckIn,
-  timeInputToInstant,
+  saveNightCheckIn,
+  setMissedReason,
+  unloggedItems,
+  type CheckInKind,
   type CheckInRow,
+  type MissedReason,
+  type MissedRow,
+  type ReminderResolution,
+  type UnloggedItem,
 } from "./checkIns";
+import { logAttendance } from "./classOverrides";
+import { logItem } from "./offline/queue";
 import { MealsCard, WaterCard } from "./LoggingCards";
 import { createTask } from "./tasks";
 import { formatTime } from "./Today";
@@ -27,7 +41,7 @@ import { Sheet } from "./ui";
 
 export interface CheckInSheetProps {
   /** Which check-in is open; null = closed. */
-  kind: "morning" | "midday" | null;
+  kind: CheckInKind | null;
   onClose: () => void;
   client: SupabaseClient | null;
   userId: string;
@@ -42,6 +56,20 @@ export interface CheckInSheetProps {
   onSetMeal: (meal: MealName, place: MealPlace) => void;
   /** Hook for the T4.1 overbooking warning; nothing is shown until then. */
   planWarning?: ReactNode;
+  /** Data for the night check-in's unlogged sweep. */
+  night?: NightSweepData;
+}
+
+export interface NightSweepData {
+  now: Date;
+  classes: PlanClass[];
+  itemLogs: ReadonlyArray<{ item_key: string }>;
+  mealLogs: MealLogRow[];
+  reminders: ReminderResolution[];
+  /** Dispatcher-marked Missed items (today and yesterday) still waiting for a reason. */
+  missed: MissedRow[];
+  /** Re-read the missed list after a reason was saved. */
+  onMissedChanged: () => void;
 }
 
 const MOOD_LABELS = ["Low", "Meh", "Okay", "Good", "Great"];
@@ -119,6 +147,9 @@ function MorningForm({
   const [wake, setWake] = useState(
     instantToTimeInput(typeof saved.wakeTime === "string" ? saved.wakeTime : defaultWakeTime(dayKey)),
   );
+  // The times shown start as suggestions; only an edit or a Confirm tap makes them data.
+  const [bedtimeTouched, setBedtimeTouched] = useState(typeof saved.bedtime === "string");
+  const [wakeTouched, setWakeTouched] = useState(typeof saved.wakeTime === "string");
   const [mood, setMood] = useState<number | undefined>(
     typeof saved.mood === "number" ? saved.mood : undefined,
   );
@@ -146,8 +177,7 @@ function MorningForm({
         userId,
         dayKey,
         {
-          bedtime: timeInputToInstant(dayKey, bedtime, "bedtime"),
-          wakeTime: timeInputToInstant(dayKey, wake, "wake"),
+          ...morningTimesToSave(dayKey, { bedtime, wake, bedtimeTouched, wakeTouched }),
           mood,
           energy,
         },
@@ -167,16 +197,46 @@ function MorningForm({
           <label className="checkin-label" htmlFor={bedId}>
             Bedtime
           </label>
-          <input id={bedId} className="checkin-input" type="time" value={bedtime} onChange={(e) => setBedtime(e.target.value)} />
+          <input
+            id={bedId}
+            className="checkin-input"
+            type="time"
+            value={bedtime}
+            onChange={(e) => {
+              setBedtime(e.target.value);
+              setBedtimeTouched(true);
+            }}
+          />
+          {!bedtimeTouched ? (
+            <button className="button button-secondary checkin-confirm" type="button" onClick={() => setBedtimeTouched(true)}>
+              Confirm
+            </button>
+          ) : null}
         </div>
         <div className="checkin-field">
           <label className="checkin-label" htmlFor={wakeId}>
             Woke up
           </label>
-          <input id={wakeId} className="checkin-input" type="time" value={wake} onChange={(e) => setWake(e.target.value)} />
+          <input
+            id={wakeId}
+            className="checkin-input"
+            type="time"
+            value={wake}
+            onChange={(e) => {
+              setWake(e.target.value);
+              setWakeTouched(true);
+            }}
+          />
+          {!wakeTouched ? (
+            <button className="button button-secondary checkin-confirm" type="button" onClick={() => setWakeTouched(true)}>
+              Confirm
+            </button>
+          ) : null}
         </div>
       </div>
-      <p className="checkin-hint">Clear a time to skip it.</p>
+      <p className="checkin-hint">
+        These times are suggestions. Edit one or tap Confirm to log it; otherwise it is not saved.
+      </p>
 
       <ScaleRow label="Mood" value={mood} onChange={setMood} />
       <ScaleRow label="Energy" value={energy} onChange={setEnergy} />
@@ -332,17 +392,313 @@ function MiddayForm({
   );
 }
 
+const SAVE_FAILED = "Couldn't save that. Check your connection and try again.";
+
+type SweepMode = "missed" | "meal";
+
+function ReasonChips({
+  label,
+  onPick,
+}: {
+  label: string;
+  onPick: (reason: MissedReason) => void;
+}) {
+  return (
+    <div className="sweep-chips" role="group" aria-label={`Why was ${label} missed?`}>
+      {MISSED_REASONS.map((r) => (
+        <button key={r.value} type="button" className="place-btn sweep-chip" onClick={() => onPick(r.value)}>
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const MEAL_PLACES: ReadonlyArray<{ place: MealPlace; label: string }> = [
+  { place: "mess", label: "Mess" },
+  { place: "outside", label: "Outside" },
+  { place: "ordered_in", label: "Ordered in" },
+];
+
+function SweepRow({
+  item,
+  outcome,
+  onDone,
+  onMeal,
+  onMissed,
+}: {
+  item: UnloggedItem;
+  outcome: string | undefined;
+  onDone: () => void;
+  onMeal: (place: MealPlace) => void;
+  onMissed: (reason: MissedReason) => void;
+}) {
+  const [mode, setMode] = useState<SweepMode | null>(null);
+  return (
+    <li className="sweep-row">
+      <div className="sweep-head">
+        <span className="sweep-title">{item.title}</span>
+        <span className="checkin-plan-time">{formatTime(item.startAt)}</span>
+      </div>
+      {outcome ? (
+        <p className="sweep-outcome" role="status">
+          {outcome}
+        </p>
+      ) : (
+        <>
+          <div className="sweep-actions" role="group" aria-label={item.title}>
+            <button
+              type="button"
+              className={`place-btn${mode === "meal" ? " place-btn-active" : ""}`}
+              aria-pressed={mode === "meal"}
+              onClick={() => (item.meal ? setMode(mode === "meal" ? null : "meal") : onDone())}
+            >
+              Done
+            </button>
+            <button
+              type="button"
+              className={`place-btn${mode === "missed" ? " place-btn-active" : ""}`}
+              aria-pressed={mode === "missed"}
+              onClick={() => setMode(mode === "missed" ? null : "missed")}
+            >
+              Missed
+            </button>
+          </div>
+          {mode === "meal" ? (
+            <div className="sweep-chips" role="group" aria-label={`Where was ${item.title}?`}>
+              {MEAL_PLACES.map((p) => (
+                <button key={p.place} type="button" className="place-btn sweep-chip" onClick={() => onMeal(p.place)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {mode === "missed" ? <ReasonChips label={item.title} onPick={onMissed} /> : null}
+        </>
+      )}
+    </li>
+  );
+}
+
+function NightForm({
+  client,
+  userId,
+  dayKey,
+  plan,
+  existing,
+  water,
+  onAddWater,
+  onSetMeal,
+  night,
+  onClose,
+}: CheckInSheetProps & { onClose: () => void }) {
+  const saved = existing?.payload ?? {};
+  const savedReflection =
+    saved.reflection && typeof saved.reflection === "object"
+      ? (saved.reflection as Record<string, unknown>)
+      : {};
+  const text = (key: string) => (typeof savedReflection[key] === "string" ? (savedReflection[key] as string) : "");
+  const [wentWell, setWentWell] = useState(text("wentWell"));
+  const [didntGo, setDidntGo] = useState(text("didntGo"));
+  const [tomorrow, setTomorrow] = useState(text("tomorrow"));
+  const [mood, setMood] = useState<number | undefined>(
+    typeof saved.mood === "number" ? saved.mood : undefined,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [resolved, setResolved] = useState<Record<string, { item: UnloggedItem; label: string }>>({});
+  const [reasoned, setReasoned] = useState<Record<string, { row: MissedRow; label: string }>>({});
+  const ids = [useId(), useId(), useId()] as const;
+
+  const live = useMemo(
+    () =>
+      night
+        ? unloggedItems(
+            plan,
+            night.classes,
+            { itemLogs: night.itemLogs, mealLogs: night.mealLogs },
+            night.reminders,
+            night.missed,
+            night.now,
+          )
+        : [],
+    [plan, night],
+  );
+  // Rows stay on screen with their outcome after being logged, so a tap never makes them jump away.
+  const rows = useMemo(() => {
+    const keys = new Set(live.map((i) => i.itemKey));
+    const extra = Object.values(resolved)
+      .map((r) => r.item)
+      .filter((i) => !keys.has(i.itemKey));
+    return [...live, ...extra].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+  }, [live, resolved]);
+  const missedRows = useMemo(() => {
+    const rowKey = (m: MissedRow) => `${m.day_key}|${m.item_key}`;
+    const keys = new Set((night?.missed ?? []).map(rowKey));
+    const extra = Object.entries(reasoned)
+      .filter(([k]) => !keys.has(k))
+      .map(([, r]) => r.row);
+    return [...(night?.missed ?? []), ...extra];
+  }, [night?.missed, reasoned]);
+
+  const guard = async (fn: () => Promise<void>) => {
+    setError("");
+    try {
+      await fn();
+    } catch {
+      setError(SAVE_FAILED);
+    }
+  };
+
+  const finish = (item: UnloggedItem, label: string) =>
+    setResolved((r) => ({ ...r, [item.itemKey]: { item, label } }));
+
+  const markDone = (item: UnloggedItem) =>
+    guard(async () => {
+      if (item.kind === "class" && item.classId) {
+        await logAttendance(userId, item.classId, "attended", item.startAt, client);
+      } else {
+        await logItem(userId, dayKey, item.itemKey, "done", client);
+      }
+      finish(item, "Done");
+    });
+
+  const markMeal = (item: UnloggedItem, place: MealPlace) => {
+    if (!item.meal) return;
+    onSetMeal(item.meal, place);
+    finish(item, "Done");
+  };
+
+  const markMissed = (item: UnloggedItem, reason: MissedReason) =>
+    guard(async () => {
+      await markItemMissed(userId, dayKey, item, reason, client);
+      finish(item, `Missed: ${reasonLabel(reason)}`);
+    });
+
+  const giveReason = (row: MissedRow, reason: MissedReason) =>
+    guard(async () => {
+      if (!client || !(await setMissedReason(client, userId, row, reason))) {
+        throw new Error("reason not saved");
+      }
+      setReasoned((r) => ({
+        ...r,
+        [`${row.day_key}|${row.item_key}`]: { row, label: reasonLabel(reason) },
+      }));
+      night?.onMissedChanged();
+    });
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await saveNightCheckIn(userId, dayKey, { wentWell, didntGo, tomorrow, mood }, client);
+      onClose();
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  const prompts = [
+    { id: ids[0], label: "What went well?", value: wentWell, set: setWentWell },
+    { id: ids[1], label: "What didn't go to plan?", value: didntGo, set: setDidntGo },
+    { id: ids[2], label: "What is the one thing for tomorrow?", value: tomorrow, set: setTomorrow },
+  ];
+
+  return (
+    <form className="checkin-form" onSubmit={(e) => void submit(e)}>
+      {missedRows.length > 0 ? (
+        <div className="checkin-field">
+          <span className="checkin-label">Marked Missed. What happened?</span>
+          <ul className="sweep-list">
+            {missedRows.map((row) => {
+              const done = reasoned[`${row.day_key}|${row.item_key}`];
+              return (
+                <li key={`${row.day_key}|${row.item_key}`} className="sweep-row">
+                  <div className="sweep-head">
+                    <span className="sweep-title">{row.title}</span>
+                    {row.day_key !== dayKey ? <span className="checkin-plan-time">Yesterday</span> : null}
+                  </div>
+                  {done ? (
+                    <p className="sweep-outcome" role="status">
+                      Missed: {done.label}
+                    </p>
+                  ) : (
+                    <ReasonChips label={row.title} onPick={(reason) => void giveReason(row, reason)} />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="checkin-field">
+        <span className="checkin-label">Still unlogged today</span>
+        {rows.length > 0 ? (
+          <ul className="sweep-list">
+            {rows.map((item) => (
+              <SweepRow
+                key={item.itemKey}
+                item={item}
+                outcome={resolved[item.itemKey]?.label}
+                onDone={() => void markDone(item)}
+                onMeal={(place) => markMeal(item, place)}
+                onMissed={(reason) => void markMissed(item, reason)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="checkin-hint">Nothing left unlogged.</p>
+        )}
+      </div>
+      {error ? <p role="alert" className="checkin-error">{error}</p> : null}
+
+      <WaterCard totals={water} onAdd={onAddWater} />
+      <ScaleRow label="Mood" value={mood} onChange={setMood} />
+
+      {prompts.map((p) => (
+        <div className="checkin-field" key={p.id}>
+          <label className="checkin-label" htmlFor={p.id}>
+            {p.label}
+          </label>
+          <textarea
+            id={p.id}
+            className="checkin-input checkin-textarea"
+            rows={2}
+            maxLength={1000}
+            value={p.value}
+            onChange={(e) => p.set(e.target.value)}
+          />
+        </div>
+      ))}
+
+      <SheetActions busy={busy} onSkip={onClose} />
+    </form>
+  );
+}
+
+function reasonLabel(value: MissedReason): string {
+  return MISSED_REASONS.find((r) => r.value === value)?.label ?? "Other";
+}
+
+const TITLES: Record<CheckInKind, string> = {
+  morning: "Morning check-in",
+  midday: "Midday check-in",
+  night: "Night check-in",
+};
+
 export function CheckInSheet(props: CheckInSheetProps) {
   const { kind, onClose } = props;
   return (
     <Sheet
       open={kind !== null}
       onClose={onClose}
-      title={kind === "midday" ? "Midday check-in" : "Morning check-in"}
+      title={TITLES[kind ?? "morning"]}
       description="Everything is optional. Skip what you don't need."
     >
       {kind === "morning" ? <MorningForm {...props} /> : null}
       {kind === "midday" ? <MiddayForm {...props} /> : null}
+      {kind === "night" ? <NightForm {...props} /> : null}
     </Sheet>
   );
 }

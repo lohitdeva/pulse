@@ -16,7 +16,13 @@ import {
   type FormEvent,
 } from "react";
 import { CheckInSheet } from "./CheckInSheet";
-import { dueCheckIn, readCheckInParam, useCheckIns } from "./checkIns";
+import {
+  dueCheckIn,
+  readCheckInParam,
+  useCheckIns,
+  useNightData,
+  type CheckInKind,
+} from "./checkIns";
 import { MealsCard, WaterCard } from "./LoggingCards";
 import { flushQueue, usePendingCount } from "./offline/queue";
 import { PushSettings } from "./PushSettings";
@@ -88,17 +94,33 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   const [activeTab, setActiveTab] = useState<TabName>("Today");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  const [openCheckIn, setOpenCheckIn] = useState<"morning" | "midday" | null>(() =>
+  const [openCheckIn, setOpenCheckIn] = useState<CheckInKind | null>(() =>
     readCheckInParam(window.location.search),
   );
   const pending = usePendingCount();
 
   useEffect(() => {
-    // `?checkin=` opened the sheet; drop it so a reload doesn't reopen it.
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("checkin")) return;
-    url.searchParams.delete("checkin");
-    window.history.replaceState(window.history.state, "", url.toString());
+    // `?checkin=` opens the sheet, on load and also when a notification tap lands on an
+    // already-open app (history navigation or the tab coming back to the foreground).
+    // The param is dropped once read so a reload doesn't reopen it.
+    const consume = () => {
+      const url = new URL(window.location.href);
+      const kind = readCheckInParam(url.search);
+      if (!url.searchParams.has("checkin")) return;
+      url.searchParams.delete("checkin");
+      window.history.replaceState(window.history.state, "", url.toString());
+      if (kind) setOpenCheckIn(kind);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") consume();
+    };
+    consume();
+    window.addEventListener("popstate", consume);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("popstate", consume);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -135,6 +157,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
     dayKey,
   );
   const { checkIns, done: checkInsDone } = useCheckIns(client, userId, dayKey);
+  const nightData = useNightData(client, userId, dayKey, openCheckIn === "night");
   const habitStatuses = useMemo<Record<string, ItemLogStatus>>(
     () => Object.fromEntries(logs.itemLogs.map((row) => [row.item_key, row.status])),
     [logs.itemLogs],
@@ -198,6 +221,15 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
         meals={mealsSummary(logs.mealLogs)}
         onAddWater={addWater}
         onSetMeal={setMeal}
+        night={{
+          now,
+          classes,
+          itemLogs: logs.itemLogs,
+          mealLogs: logs.mealLogs,
+          reminders: nightData.reminders,
+          missed: nightData.missed,
+          onMissedChanged: nightData.refetch,
+        }}
       />
 
       <BottomTabs activeTab={activeTab} onChange={setActiveTab} />

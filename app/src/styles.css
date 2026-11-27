@@ -371,3 +371,60 @@ a:focus-visible {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Night check-in: unlogged sweep, reasons, reflection (T3.4b) */
+.checkin-confirm {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.checkin-textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.sweep-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sweep-row {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pulse-border);
+}
+
+.sweep-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pulse-gap);
+  font-size: 0.9rem;
+}
+
+.sweep-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sweep-actions,
+.sweep-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sweep-actions .place-btn {
+  min-width: 80px;
+}
+
+.sweep-outcome {
+  margin: 0;
+  color: var(--pulse-green);
+  font-size: 0.82rem;
+}

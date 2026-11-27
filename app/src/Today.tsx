@@ -7,6 +7,7 @@ import {
   type ScheduleItem,
 } from "@pulse/shared";
 import type { ChangeAlert } from "./classes";
+import type { CheckInKind } from "./checkIns";
 import { AddExtraClass, ClassRowActions, type ClassActionsApi } from "./ClassActions";
 import { Card, IconChip, RingGauge } from "./ui";
 
@@ -25,11 +26,26 @@ export interface TodayProps {
   onHabitStatusChange?: (itemKey: string, status: "done" | "skipped") => void;
   logging?: ReactNode;
   /** Check-in card to offer now (see `dueCheckIn`); null/omitted = none. */
-  checkInDue?: "morning" | "midday" | null;
-  onOpenCheckIn?: (kind: "morning" | "midday") => void;
+  checkInDue?: CheckInKind | null;
+  onOpenCheckIn?: (kind: CheckInKind) => void;
   /** Class attendance / cancel / move / extra-class controls; omitted = read-only classes. */
   classActions?: ClassActionsApi;
 }
+
+const CHECKIN_COPY: Record<CheckInKind, { title: string; note: string }> = {
+  morning: {
+    title: "Morning check-in",
+    note: "Sleep, mood, routine and today's plan. Under 2 minutes.",
+  },
+  midday: {
+    title: "Midday check-in",
+    note: "Meals, water, mood and quick adds. Under 2 minutes.",
+  },
+  night: {
+    title: "Night check-in",
+    note: "Reflection, water, mood, and anything still unlogged. Under 2 minutes.",
+  },
+};
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -277,14 +293,8 @@ export function Today({
         <Card className="checkin-card" role="group" aria-label="Check-in">
           <div className="checkin-card-copy">
             <p className="now-label">CHECK-IN</p>
-            <h2 className="checkin-card-title">
-              {checkInDue === "morning" ? "Morning check-in" : "Midday check-in"}
-            </h2>
-            <p className="log-note">
-              {checkInDue === "morning"
-                ? "Sleep, mood, routine and today's plan. Under 2 minutes."
-                : "Meals, water, mood and quick adds. Under 2 minutes."}
-            </p>
+            <h2 className="checkin-card-title">{CHECKIN_COPY[checkInDue].title}</h2>
+            <p className="log-note">{CHECKIN_COPY[checkInDue].note}</p>
           </div>
           <button className="button button-primary" type="button" onClick={() => onOpenCheckIn(checkInDue)}>
             Start
