@@ -2,14 +2,14 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** Phase 3 go-live (awaiting user OK), then S23 reminder test; then Phase 4 (T4.1) in a fresh session.
+**Next action:** T3.6 (service_role grants hotfix) → push it to hosted (user OK) → confirm dispatch ticks return 200 → S23 reminder test; then Phase 4 (T4.1) in a fresh session.
 **Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-1. Approve the Phase 3 go-live (planner runs it): `supabase db push --remote` (reminders + check_ins migrations), deploy `dispatch-reminders` (--no-verify-jwt) and `notification-action`, `git push` (Vercel deploys the app).
-2. After go-live, on the S23: open Pulse once (refreshes the worker config), wait for the next must-do reminder, tap Done or Snooze, and confirm it stops / returns 10 min later.
+1. Go-live ran 2026-11-27 (user OK): both migrations applied, both functions deployed, main + phase-3 tag pushed. Dispatcher ticks return 500 until T3.6 lands.
+2. After T3.6 is live, on the S23: open Pulse once (refreshes the worker config), wait for the next must-do reminder, tap Done or Snooze, and confirm it stops / returns 10 min later.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
@@ -27,6 +27,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 - T3.4a DONE (checker PASS, 315 tests; ~1,200 lines — size exception accepted, single concern). `check_ins` migration NOT on hosted. Component is CheckInSheet.tsx (case clash). Gaps: quick-add task not offline-queued; `?checkin=` read on mount only; untouched default bedtime/wake are saved → fix in T3.4b.
 - T3.4b DONE (2nd checker PASS, 335 tests). User-marked misses = item_logs missed + meta.reason (queued); dispatcher misses = missed_items, reason via online UPDATE. `?checkin=` handled on mount/popstate/visibilitychange.
 - T3.5 DONE. **PHASE 3 CODE-COMPLETE** (tag phase-3, local): gate PASS, 352 tests (shared 110, functions 88, app 154). Nothing from Phase 3 is live yet: migrations 20261127010000_reminders + 20261127020000_check_ins unpushed; dispatch-reminders never deployed (Deno resolution unverified); git main unpushed since ef1286a.
+- GO-LIVE 2026-11-27 03:39 UTC: migrations + dispatch-reminders + notification-action deployed, main pushed. Deno imports resolved fine. Cron ticks → 500 'Dispatch failed': postgres log shows `permission denied for table meal_logs/item_logs/settings/push_subscriptions/water_logs/tasks` — hosted project has NO default service_role grants; Phase 1 migrations only granted authenticated. T3.6 = grants-only migration. Debug tip: `supabase logs --remote --service postgres --since 10m --output-format text`.
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -82,6 +83,7 @@ _(The planner writes exact steps here when a ticket needs accounts, secrets, a p
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | DONE |
 | T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | DONE |
 | T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | DONE |
+| T3.6 | Hotfix: grant service_role the table privileges the dispatcher and notification-action need (hosted has no default service_role grants) | §14 | IN PROGRESS |
 
 ## Phase 4: Tasks and deadlines (PRD §5)
 | ID | Ticket | PRD | Status |
