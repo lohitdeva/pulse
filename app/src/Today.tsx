@@ -24,6 +24,9 @@ export interface TodayProps {
   habitStatuses?: Record<string, ItemLogStatus>;
   onHabitStatusChange?: (itemKey: string, status: "done" | "skipped") => void;
   logging?: ReactNode;
+  /** Check-in card to offer now (see `dueCheckIn`); null/omitted = none. */
+  checkInDue?: "morning" | "midday" | null;
+  onOpenCheckIn?: (kind: "morning" | "midday") => void;
   /** Class attendance / cancel / move / extra-class controls; omitted = read-only classes. */
   classActions?: ClassActionsApi;
 }
@@ -200,6 +203,8 @@ export function Today({
   habitStatuses = {},
   onHabitStatusChange,
   logging,
+  checkInDue = null,
+  onOpenCheckIn,
   classActions,
 }: TodayProps) {
   const { current, next, fraction } = nowNext(plan, now);
@@ -267,6 +272,25 @@ export function Today({
           )}
         </div>
       </Card>
+
+      {checkInDue && onOpenCheckIn ? (
+        <Card className="checkin-card" role="group" aria-label="Check-in">
+          <div className="checkin-card-copy">
+            <p className="now-label">CHECK-IN</p>
+            <h2 className="checkin-card-title">
+              {checkInDue === "morning" ? "Morning check-in" : "Midday check-in"}
+            </h2>
+            <p className="log-note">
+              {checkInDue === "morning"
+                ? "Sleep, mood, routine and today's plan. Under 2 minutes."
+                : "Meals, water, mood and quick adds. Under 2 minutes."}
+            </p>
+          </div>
+          <button className="button button-primary" type="button" onClick={() => onOpenCheckIn(checkInDue)}>
+            Start
+          </button>
+        </Card>
+      ) : null}
 
       {alerts.length > 0 ? (
         <Card className="alerts-card" role="group" aria-label="Timetable changes">

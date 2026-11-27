@@ -2,7 +2,7 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T3.4a morning + midday check-ins. User chose (2026-11-27): go live with reminders only AFTER T3.4–T3.5 — then ask once: push migrations, deploy dispatch-reminders (--no-verify-jwt) + notification-action, git push.
+**Next action:** T3.4b night check-in. Then T3.5, phase-3 gate, then ONE user-approved go-live: push migrations (reminders + check_ins), deploy dispatch-reminders (--no-verify-jwt) + notification-action, git push.
 **Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
@@ -23,6 +23,7 @@ _(Nothing right now.)_
 - T3.2a DONE (checker PASS by SQL review; pgTAP plan 30 not run). Migration NOT on hosted yet. Cron `dispatch-reminders` every minute posts Bearer <vault dispatch_cron_secret> to /functions/v1/dispatch-reminders; function must verify via `check_dispatch_secret` (service_role) and deploy with verify_jwt=false. Hosted has pg_cron/pg_net available (not installed), vault+pgcrypto installed.
 - T3.2b DONE (checker PASS, 258 tests). Owner via COLLEGE_TIMETABLE_OWNER_ID env (same as ingest). Item keys habit:/must:<day>:<order>, class:<id>. Alerts at-least-once (re-send if mark fails). shared/reminders.ts + dayplan.ts now use `.ts` imports; root tsconfig has allowImportingTsExtensions (user-approved). Deno resolution unverified locally (no deno) — deploy will reveal. app/src/push.ts only handles 'pulse-test' → fix in T3.3.
 - T3.3 DONE (2nd checker PASS, 296 tests). Action tokens = stateless HMAC `userId.expiry.sig` (12 h, bound to user/day/item), HKDF-SHA256 key from SUPABASE_SERVICE_ROLE_KEY. Meal Done from notification writes `reminders` only. Function handlers now type-checked via supabase/functions/tsconfig include.
+- T3.4a DONE (checker PASS, 315 tests; ~1,200 lines — size exception accepted, single concern). `check_ins` migration NOT on hosted. Component is CheckInSheet.tsx (case clash). Gaps: quick-add task not offline-queued; `?checkin=` read on mount only; untouched default bedtime/wake are saved → fix in T3.4b.
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -75,8 +76,8 @@ _(Nothing right now.)_
 | T3.2a | Tables `reminders`, `notification_log`, `missed_items` (RLS); pg_cron + pg_net every minute calling the dispatcher with a cron secret | §6, §14 | DONE |
 | T3.2b | `dispatch-reminders` function using `shared/reminders.ts`; also delivers queued timetable change alerts | §6, §14 | DONE |
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | DONE |
-| T3.4a | Check-in sheets: morning and midday | §6 Check-ins | IN PROGRESS |
-| T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | TODO |
+| T3.4a | Check-in sheets: morning and midday | §6 Check-ins | DONE |
+| T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | IN PROGRESS |
 | T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | TODO |
 
 ## Phase 4: Tasks and deadlines (PRD §5)

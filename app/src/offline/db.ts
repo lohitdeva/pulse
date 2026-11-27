@@ -1,6 +1,10 @@
 import Dexie, { type EntityTable } from "dexie";
 
-export type LogTable = "item_logs" | "meal_logs" | "water_logs";
+export type LogTable =
+  | "item_logs"
+  | "meal_logs"
+  | "water_logs"
+  | "check_ins";
 
 export type PendingMutation = {
   id?: number;

@@ -237,3 +237,137 @@ a:focus-visible {
 .add-class-button {
   margin-bottom: 12px;
 }
+
+/* Check-ins: Today card and sheet forms (T3.4a) */
+.checkin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulse-gap);
+  border-color: var(--pulse-mint);
+}
+
+.checkin-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.checkin-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.checkin-form {
+  display: grid;
+  gap: 16px;
+}
+
+.checkin-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pulse-gap);
+}
+
+.checkin-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.checkin-label {
+  color: var(--pulse-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.checkin-hint {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.78rem;
+}
+
+.checkin-input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--pulse-control-size);
+  border: 1px solid var(--pulse-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: var(--pulse-bg);
+  color: var(--pulse-text);
+  font: inherit;
+}
+
+.checkin-input:focus-visible {
+  outline: 2px solid var(--pulse-blue-light);
+  outline-offset: 2px;
+}
+
+.checkin-scale {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.checkin-hygiene,
+.checkin-plan,
+.checkin-added {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkin-hygiene-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulse-gap);
+  font-size: 0.9rem;
+}
+
+.checkin-hygiene-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.checkin-hygiene-actions .place-btn {
+  min-width: 64px;
+}
+
+.checkin-plan li {
+  display: flex;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+
+.checkin-plan-time {
+  flex: none;
+  min-width: 44px;
+  color: var(--pulse-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.checkin-task-row {
+  display: flex;
+  gap: 8px;
+}
+
+.checkin-added {
+  color: var(--pulse-green);
+  font-size: 0.82rem;
+}
+
+.checkin-error {
+  margin: 0;
+  color: var(--pulse-red);
+  font-size: 0.82rem;
+}
+
+.checkin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

@@ -15,6 +15,8 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { CheckInSheet } from "./CheckInSheet";
+import { dueCheckIn, readCheckInParam, useCheckIns } from "./checkIns";
 import { MealsCard, WaterCard } from "./LoggingCards";
 import { flushQueue, usePendingCount } from "./offline/queue";
 import { PushSettings } from "./PushSettings";
@@ -86,7 +88,18 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
   const [activeTab, setActiveTab] = useState<TabName>("Today");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [openCheckIn, setOpenCheckIn] = useState<"morning" | "midday" | null>(() =>
+    readCheckInParam(window.location.search),
+  );
   const pending = usePendingCount();
+
+  useEffect(() => {
+    // `?checkin=` opened the sheet; drop it so a reload doesn't reopen it.
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("checkin")) return;
+    url.searchParams.delete("checkin");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, []);
 
   useEffect(() => {
     const flush = () => {
@@ -121,6 +134,7 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
     userId,
     dayKey,
   );
+  const { checkIns, done: checkInsDone } = useCheckIns(client, userId, dayKey);
   const habitStatuses = useMemo<Record<string, ItemLogStatus>>(
     () => Object.fromEntries(logs.itemLogs.map((row) => [row.item_key, row.status])),
     [logs.itemLogs],
@@ -151,6 +165,8 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
             onOpenSettings={() => setSettingsOpen(true)}
             habitStatuses={habitStatuses}
             onHabitStatusChange={setItemStatus}
+            checkInDue={dueCheckIn(now, checkInsDone)}
+            onOpenCheckIn={setOpenCheckIn}
             classActions={classActions}
             logging={
               <>
@@ -168,6 +184,21 @@ function SignedInShell({ client, userId, signingOut, error, onSignOut }: SignedI
           <p>Coming soon</p>
         </main>
       )}
+
+      <CheckInSheet
+        kind={openCheckIn}
+        onClose={() => setOpenCheckIn(null)}
+        client={client}
+        userId={userId}
+        dayKey={dayKey}
+        plan={plan}
+        existing={checkIns.find((row) => row.kind === openCheckIn)}
+        habitStatuses={habitStatuses}
+        water={waterTotals(logs.waterLogs)}
+        meals={mealsSummary(logs.mealLogs)}
+        onAddWater={addWater}
+        onSetMeal={setMeal}
+      />
 
       <BottomTabs activeTab={activeTab} onChange={setActiveTab} />
 
