@@ -447,6 +447,7 @@ describe("reminder notification action sets", () => {
     ["habit:2026-11-26:2", 3, ["done"]],
     ["class:abc:attendance", 3, ["attended", "missed"]],
     ["alert:abc", 3, []],
+    ["digest:2026-11-26", 3, []],
     ["water:11", 3, []],
   ])("%s with %i slots shows %j", (itemKey, max, expected) => {
     expect(reminderActionsFor(itemKey, max).map((a) => a.action)).toEqual(expected);
@@ -499,6 +500,36 @@ describe("service worker reminder pushes", () => {
 
     await dispatchClick(handlers, "", { kind: "reminder-generic" });
     expect(scope.clients.openWindow).toHaveBeenCalledWith("https://pulse.example/");
+  });
+
+  it("shows the morning digest with no buttons and opens the morning check-in on tap", async () => {
+    const { scope, handlers } = makeWorkerScope();
+    installPushWorkerHandlers(scope);
+    const key = "digest:2026-11-26";
+    await dispatchPush(handlers, {
+      ...reminderPayload(key, { url: "/?checkin=morning", actionToken: undefined }),
+      title: "Today: 2 classes",
+      body: "9:30 MM-II-3 · 11:15 OM-I-2",
+    });
+    const show = vi.mocked(scope.registration.showNotification);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(show.mock.calls[0]![0]).toBe("Today: 2 classes");
+    expect(show.mock.calls[0]![1]).toMatchObject({
+      body: "9:30 MM-II-3 · 11:15 OM-I-2",
+      tag: key,
+      actions: [],
+      data: { kind: "reminder", itemKey: key, url: "/?checkin=morning" },
+    });
+
+    await dispatchClick(handlers, "", {
+      kind: "reminder",
+      itemKey: key,
+      dayKey: "2026-11-26",
+      url: "/?checkin=morning",
+    });
+    expect(scope.clients.openWindow).toHaveBeenCalledWith(
+      "https://pulse.example/?checkin=morning",
+    );
   });
 
   it("adds Skip when the platform allows three actions", async () => {

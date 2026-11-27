@@ -10,6 +10,7 @@
 import { signActionToken } from "../notification-action/handler.ts";
 import { buildDayPlan, templateForDayKey } from "../../../shared/dayplan.ts";
 import type { PlanClass } from "../../../shared/dayplan.ts";
+import { buildMorningDigest } from "../../../shared/morningDigest.ts";
 import { waterTotals } from "../../../shared/logging.ts";
 import type { WaterLogRow } from "../../../shared/logging.ts";
 import {
@@ -40,6 +41,9 @@ const MAX_ALERTS_PER_RUN = 5;
 /** Same night window as the reminder engine (02:00-07:00 IST). */
 const NIGHT_QUIET_START_HOUR = 2;
 const NIGHT_QUIET_END_HOUR = 7;
+/** Morning digest: fires at 08:40 IST, dropped once 12:00 IST passes. */
+const DIGEST_FIRE_MINUTES_AFTER_DAY_START = 4 * 60 + 40;
+const DIGEST_LAPSE_MINUTES_AFTER_DAY_START = 8 * 60;
 const ATTENDANCE_VALUES = new Set(["attended", "missed", "medical", "cancelled"]);
 
 /** Subset of `public.classes` (same columns app/src/classes.ts reads). */
@@ -86,6 +90,13 @@ export interface AlertRow {
   summary: string;
 }
 
+/** Subset of `public.tasks` the digest needs. */
+export interface DigestTaskRow {
+  title: string;
+  deadline_at: string | null;
+  status: string;
+}
+
 export interface DayData {
   classes: ClassRow[];
   reminders: ReminderRow[];
@@ -95,6 +106,10 @@ export interface DayData {
   /** `settings.data.facility_hours`, unvalidated, or null when not stored. */
   facilityHours: unknown;
   subscriptions: SubscriptionRow[];
+  /** Tasks with a deadline from the day start onwards (the digest filters to 72 h). */
+  tasks: DigestTaskRow[];
+  /** Timetable change alerts queued today, delivered or not. */
+  todayAlerts: AlertRow[];
 }
 
 export interface ReminderUpsert {
@@ -181,6 +196,7 @@ export interface DispatchCounts {
   missed: number;
   attendancePrompts: number;
   alerts: number;
+  digest: number;
   removedSubscriptions: number;
 }
 
@@ -330,6 +346,7 @@ export function createDispatchRemindersHandler(
       missed: 0,
       attendancePrompts: 0,
       alerts: 0,
+      digest: 0,
       removedSubscriptions: 0,
     };
 
@@ -568,6 +585,61 @@ export function createDispatchRemindersHandler(
             await store.markAlertDelivered(ownerId, alert.id, nowIso);
             counts.alerts += 1;
           }
+        }
+      }
+
+      // Morning digest: once per day from 08:40, held like alerts, dropped after 12:00.
+      const digestKey = `digest:${dayKey}`;
+      const digestFireAt = new Date(
+        range.start.getTime() + DIGEST_FIRE_MINUTES_AFTER_DAY_START * 60_000,
+      );
+      const digestLapseAt = new Date(
+        range.start.getTime() + DIGEST_LAPSE_MINUTES_AFTER_DAY_START * 60_000,
+      );
+      if (
+        !heldForQuiet &&
+        now.getTime() >= digestFireAt.getTime() &&
+        now.getTime() < digestLapseAt.getTime() &&
+        (sentCounts.get(digestKey) ?? 0) === 0
+      ) {
+        const digest = buildMorningDigest({
+          dayKey,
+          classes: planClasses.map((c) => ({
+            title: c.title,
+            start: c.startAt,
+            cancelled: c.cancelled,
+          })),
+          changes: data.todayAlerts.map((a) => ({ summary: a.summary })),
+          deadlines: data.tasks.flatMap((t) =>
+            t.deadline_at
+              ? [{ title: t.title, due: new Date(t.deadline_at), status: t.status }]
+              : [],
+          ),
+          now,
+        });
+        const outcome = await deliver(digestKey, "other", {
+          type: "pulse-reminder",
+          title: digest.title,
+          body: digest.body,
+          tag: digestKey,
+          data: { itemKey: digestKey, dayKey, url: "/?checkin=morning" },
+          actions: [],
+        });
+        if (outcome.delivered > 0) {
+          // Generic title only: no notification text is stored.
+          await store.upsertReminder({
+            user_id: ownerId,
+            day_key: dayKey,
+            item_key: digestKey,
+            level: "nudge",
+            kind: "other",
+            title: "Morning digest",
+            fire_at: digestFireAt.toISOString(),
+            window_end: digestLapseAt.toISOString(),
+            sent_count: 1,
+            last_sent_at: nowIso,
+          });
+          counts.digest += 1;
         }
       }
     } catch {

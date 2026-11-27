@@ -6,6 +6,7 @@ import {
   type AlertRow,
   type ClassRow,
   type DayData,
+  type DigestTaskRow,
   type DispatchStore,
   type ItemLogRow,
   type PushPayload,
@@ -54,6 +55,8 @@ interface Setup {
   itemLogs?: ItemLogRow[];
   subscriptions?: SubscriptionRow[];
   alerts?: AlertRow[];
+  tasks?: DigestTaskRow[];
+  todayAlerts?: AlertRow[];
   pushStatus?: number;
 }
 
@@ -78,6 +81,8 @@ function setup(opts: Setup) {
       waterLogs: [],
       facilityHours: null,
       subscriptions,
+      tasks: opts.tasks ?? [],
+      todayAlerts: opts.todayAlerts ?? [],
     }),
     upsertReminder: async (row) => {
       upserts.push(row);
@@ -290,5 +295,86 @@ describe("dispatch-reminders", () => {
     });
     await t.call();
     expect(t.pushed.some((p) => p.title === "How was OM-I-2?")).toBe(false);
+  });
+
+  describe("morning digest", () => {
+    const digests = (t: ReturnType<typeof setup>) =>
+      t.pushed.filter((p) => p.data.itemKey === `digest:${DAY}`);
+
+    it("fires at 08:40 once with the check-in link, no actions and no stored text", async () => {
+      const t = setup({
+        now: at("08:40"),
+        classes: [classRow("c-9", "09:30", "10:30")],
+        tasks: [
+          { title: "Case memo", deadline_at: at("18:00").toISOString(), status: "To do" },
+          { title: "Old", deadline_at: at("18:00").toISOString(), status: "Done" },
+        ],
+        todayAlerts: [{ id: "a1", summary: "OM-I-2 moved to 9:30" }],
+      });
+      await t.call();
+      const [digest] = digests(t);
+      expect(digests(t)).toHaveLength(1);
+      expect(digest).toMatchObject({
+        title: "Today: 1 class",
+        tag: `digest:${DAY}`,
+        actions: [],
+        data: { url: "/?checkin=morning", dayKey: DAY },
+      });
+      expect(digest!.data.actionToken).toBeUndefined();
+      expect(digest!.body).toContain("9:30 OM-I-2");
+      expect(digest!.body).toContain("Changes: OM-I-2 moved to 9:30");
+      expect(digest!.body).toContain("Due soon: Case memo Thu 18:00");
+      expect(digest!.body).not.toContain("Old");
+      const row = t.upserts.find((u) => u.item_key === `digest:${DAY}`)!;
+      expect(row).toMatchObject({ level: "nudge", kind: "other", sent_count: 1 });
+      expect(row.title).toBe("Morning digest");
+      expect(t.logs.some((l) => l.item_key === `digest:${DAY}` && l.status === "sent")).toBe(true);
+    });
+
+    it("does not fire at 08:39", async () => {
+      const t = setup({ now: at("08:39") });
+      await t.call();
+      expect(digests(t)).toHaveLength(0);
+    });
+
+    it("does not send a second digest on later runs", async () => {
+      const t = setup({ now: at("08:40") });
+      await t.call();
+      await t.call();
+      t.clock.now = at("08:41");
+      await t.call();
+      t.clock.now = at("11:59");
+      await t.call();
+      expect(digests(t)).toHaveLength(1);
+    });
+
+    it("is held during a class and sent when it ends", async () => {
+      const t = setup({ now: at("08:40"), classes: [classRow("c-10", "08:30", "09:30")] });
+      await t.call();
+      expect(digests(t)).toHaveLength(0);
+      t.clock.now = at("09:15");
+      await t.call();
+      expect(digests(t)).toHaveLength(0);
+      t.clock.now = at("09:31");
+      await t.call();
+      expect(digests(t)).toHaveLength(1);
+    });
+
+    it("is dropped once 12:00 has passed", async () => {
+      const t = setup({ now: at("12:00") });
+      await t.call();
+      expect(digests(t)).toHaveLength(0);
+      const held = setup({ now: at("08:40"), classes: [classRow("c-11", "08:30", "12:30")] });
+      await held.call();
+      held.clock.now = at("12:31");
+      await held.call();
+      expect(digests(held)).toHaveLength(0);
+    });
+
+    it("retries next minute when no device received it", async () => {
+      const t = setup({ now: at("08:40"), pushStatus: 500 });
+      await t.call();
+      expect(t.upserts.some((u) => u.item_key === `digest:${DAY}`)).toBe(false);
+    });
   });
 });

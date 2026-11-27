@@ -61,7 +61,17 @@ function createStore(supabaseUrl: string, serviceRoleKey: string): DispatchStore
       const classFilter =
         `(and(manual_starts_at.gte.${rangeStart},manual_starts_at.lt.${rangeEnd}),` +
         `and(manual_starts_at.is.null,source_starts_at.gte.${rangeStart},source_starts_at.lt.${rangeEnd}))`;
-      const [classes, reminders, itemLogs, mealLogs, waterLogs, settings, subscriptions] =
+      const [
+        classes,
+        reminders,
+        itemLogs,
+        mealLogs,
+        waterLogs,
+        settings,
+        subscriptions,
+        tasks,
+        todayAlerts,
+      ] =
         await Promise.all([
           rows<DayData["classes"][number]>(
             `classes?${q({
@@ -94,6 +104,28 @@ function createStore(supabaseUrl: string, serviceRoleKey: string): DispatchStore
           rows<SubscriptionRow>(
             `push_subscriptions?${q({ select: "id,endpoint,p256dh,auth", user_id: user })}`,
           ),
+          // Digest inputs: open tasks due from today onwards (the digest keeps the next 72 h).
+          rows<DayData["tasks"][number]>(
+            `tasks?${q({
+              select: "title,deadline_at,status",
+              user_id: user,
+              status: "not.in.(Done,Dropped)",
+              and: `(deadline_at.gte.${rangeStart},deadline_at.lt.${new Date(
+                new Date(rangeStart).getTime() + 4 * 24 * 3_600_000,
+              ).toISOString()})`,
+              order: "deadline_at.asc",
+              limit: "50",
+            })}`,
+          ),
+          rows<AlertRow>(
+            `timetable_change_alerts?${q({
+              select: "id,summary",
+              user_id: user,
+              and: `(queued_at.gte.${rangeStart},queued_at.lt.${rangeEnd})`,
+              order: "queued_at.asc",
+              limit: "10",
+            })}`,
+          ),
         ]);
       return {
         classes,
@@ -103,6 +135,8 @@ function createStore(supabaseUrl: string, serviceRoleKey: string): DispatchStore
         waterLogs,
         facilityHours: settings[0]?.data?.facility_hours ?? null,
         subscriptions,
+        tasks,
+        todayAlerts,
       };
     },
 

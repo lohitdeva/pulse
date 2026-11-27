@@ -337,13 +337,19 @@ const REMINDER_ACTION_NAMES = new Set<string>([
 /**
  * Buttons per reminder kind, decided from the item key. Must-do items get Done and
  * Snooze (plus Skip where the platform shows 3 or more actions), nudges get Done,
- * attendance prompts get Attended / Missed, timetable alerts and water get none.
+ * attendance prompts get Attended / Missed, timetable alerts, water and the morning digest get none.
  */
 export function reminderActionsFor(
   itemKey: string,
   maxActions = 2,
 ): ReminderNotificationAction[] {
-  if (itemKey.startsWith("alert:") || itemKey.startsWith("water:")) return [];
+  if (
+    itemKey.startsWith("alert:") ||
+    itemKey.startsWith("water:") ||
+    itemKey.startsWith("digest:")
+  ) {
+    return [];
+  }
   if (itemKey.endsWith(":attendance")) {
     return [
       { action: "attended", title: "Attended" },

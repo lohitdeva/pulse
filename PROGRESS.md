@@ -2,13 +2,14 @@
 
 The planner keeps this file current: ticket status, next action, what needs the user, and a session log. Status values are `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` and `WAITING ON USER`.
 
-**Next action:** T3.5 morning digest. Then phase-3 gate, then ONE user-approved go-live: push migrations (reminders + check_ins), deploy dispatch-reminders (--no-verify-jwt) + notification-action, git push.
+**Next action:** Phase 3 go-live (awaiting user OK), then S23 reminder test; then Phase 4 (T4.1) in a fresh session.
 **Current phase:** 3 — Reminder engine and check-ins
 
 ## Needs you
 _(The planner writes exact steps here when a ticket needs accounts, secrets, a phone, or a decision.)_
 
-_(Nothing right now.)_
+1. Approve the Phase 3 go-live (planner runs it): `supabase db push --remote` (reminders + check_ins migrations), deploy `dispatch-reminders` (--no-verify-jwt) and `notification-action`, `git push` (Vercel deploys the app).
+2. After go-live, on the S23: open Pulse once (refreshes the worker config), wait for the next must-do reminder, tap Done or Snooze, and confirm it stops / returns 10 min later.
 
 **✅ Git auto-deploy is connected (verified 26 Nov):** a push to `main` auto-builds and deploys production on Vercel (push to c757089 went live in ~40s). `vercel --prod` remains a manual fallback. NB every push to `main` now triggers a prod deploy.
 
@@ -25,6 +26,7 @@ _(Nothing right now.)_
 - T3.3 DONE (2nd checker PASS, 296 tests). Action tokens = stateless HMAC `userId.expiry.sig` (12 h, bound to user/day/item), HKDF-SHA256 key from SUPABASE_SERVICE_ROLE_KEY. Meal Done from notification writes `reminders` only. Function handlers now type-checked via supabase/functions/tsconfig include.
 - T3.4a DONE (checker PASS, 315 tests; ~1,200 lines — size exception accepted, single concern). `check_ins` migration NOT on hosted. Component is CheckInSheet.tsx (case clash). Gaps: quick-add task not offline-queued; `?checkin=` read on mount only; untouched default bedtime/wake are saved → fix in T3.4b.
 - T3.4b DONE (2nd checker PASS, 335 tests). User-marked misses = item_logs missed + meta.reason (queued); dispatcher misses = missed_items, reason via online UPDATE. `?checkin=` handled on mount/popstate/visibilitychange.
+- T3.5 DONE. **PHASE 3 CODE-COMPLETE** (tag phase-3, local): gate PASS, 352 tests (shared 110, functions 88, app 154). Nothing from Phase 3 is live yet: migrations 20261127010000_reminders + 20261127020000_check_ins unpushed; dispatch-reminders never deployed (Deno resolution unverified); git main unpushed since ef1286a.
 - Deferred: in-app manual Refresh / open-sync (needs bridge as Apps Script web app).
 
 ## Phase 0: Foundations and push spike (PRD §13, §14, §15)
@@ -79,7 +81,7 @@ _(Nothing right now.)_
 | T3.3 | Notification actions end to end (Done / Snooze 10 / Skip with reason), opening the item focused | §6 | DONE |
 | T3.4a | Check-in sheets: morning and midday | §6 Check-ins | DONE |
 | T3.4b | Night check-in, including the unlogged-items sweep and missed reasons | §6 Check-ins, §11 Missed log | DONE |
-| T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | IN PROGRESS |
+| T3.5 | Morning digest push at 8:40 (PRD §6) | §6 Morning digest | DONE |
 
 ## Phase 4: Tasks and deadlines (PRD §5)
 | ID | Ticket | PRD | Status |
@@ -167,3 +169,4 @@ _(One line per session: `YYYY-MM-DD HH:MM · Codex|Claude Code · tickets done �
 - 2026-11-27 00:20 · Codex · T2.3c fix deployed · waiting for college rerun and trigger installation.
 - 2026-11-27 · Claude Code · took over from Codex; T2.2 + T2.3c DONE (hosted sync verified) · starting T2.4a ∥ T3.1.
 - 2026-11-27 · Claude Code · T2.4a–c + T3.1 DONE; class_overrides migration on hosted; **PHASE 2 COMPLETE** (tag phase-2) · starting T3.2a.
+- 2026-11-27 · Claude Code · T3.1–T3.5 DONE; **PHASE 3 CODE-COMPLETE** (tag phase-3) · stopped for user-approved go-live (migrations + 2 functions + git push) and S23 reminder test.
